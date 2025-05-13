@@ -525,8 +525,9 @@
         </div>
     </footer>
 
-<script>
-    const songs = [
+   <script>
+    // Music data
+   const songs = [
             { "title": "Aankhon Me Teri", "artist": "kk", "url": "KK/Aankhon Me Teri.mp3", "image": "KKK.jpg", 
               "lyrics": [
                 {"time": 0, "text": "Aankhon mein teri"},
@@ -706,7 +707,6 @@
     let filteredSongs = [...songs];
     let audioContext;
     let analyser;
-    let beatDetector;
     let dataArray;
     let animationId;
     let sleepTimer = null;
@@ -717,22 +717,6 @@
     let isDynamicBgEnabled = true;
     let isCrossfadeEnabled = false;
     let audioNodes = {};
-    let lastBeatTime = 0;
-    let beatInterval = 0;
-    let beatCount = 0;
-    let bpm = 0;
-    let currentGenre = '';
-
-    // EQ Preset Configurations
-    const eqPresetConfigs = {
-        'flat': { bass: 0, mids: 0, treble: 0 },
-        'rock': { bass: 5, mids: 2, treble: 3 },
-        'pop': { bass: 4, mids: 3, treble: 4 },
-        'classical': { bass: 2, mids: 5, treble: 4 },
-        'jazz': { bass: 3, mids: 4, treble: 2 },
-        'electronic': { bass: 6, mids: 2, treble: 5 },
-        'custom': { bass: 0, mids: 0, treble: 0 }
-    };
 
     // Initialize
     function init() {
@@ -770,28 +754,41 @@
 
     // Handle browser autoplay policies
     function handleAutoplay() {
+        // Add a user gesture requirement for audio playback
         document.body.addEventListener('click', function enableAudio() {
+            // This empty event handler helps with autoplay policies
             document.body.removeEventListener('click', enableAudio);
         }, { once: true });
     }
 
     // Load saved data from localStorage
     function loadSavedData() {
+        // Load ratings
         const savedRatings = localStorage.getItem('songRatings');
-        if (savedRatings) songRatings = JSON.parse(savedRatings);
+        if (savedRatings) {
+            songRatings = JSON.parse(savedRatings);
+        }
         
+        // Load play history
         const savedHistory = localStorage.getItem('playHistory');
-        if (savedHistory) playHistory = JSON.parse(savedHistory);
+        if (savedHistory) {
+            playHistory = JSON.parse(savedHistory);
+        }
         
+        // Load playlists
         const savedPlaylists = localStorage.getItem('userPlaylists');
-        if (savedPlaylists) userCreatedPlaylists = JSON.parse(savedPlaylists);
+        if (savedPlaylists) {
+            userCreatedPlaylists = JSON.parse(savedPlaylists);
+        }
         
+        // Load settings
         const savedSettings = localStorage.getItem('playerSettings');
         if (savedSettings) {
             const settings = JSON.parse(savedSettings);
             isDynamicBgEnabled = settings.dynamicBg !== false;
             isCrossfadeEnabled = settings.crossfade || false;
             
+            // Update UI to match settings
             dynamicBgToggle.checked = isDynamicBgEnabled;
             crossfadeToggle.checked = isCrossfadeEnabled;
         }
@@ -803,6 +800,7 @@
         localStorage.setItem('playHistory', JSON.stringify(playHistory));
         localStorage.setItem('userPlaylists', JSON.stringify(userCreatedPlaylists));
         
+        // Save settings
         const settings = {
             dynamicBg: isDynamicBgEnabled,
             crossfade: isCrossfadeEnabled
@@ -887,9 +885,10 @@
         nextSong();
     }
 
-    // Initialize audio context for visualizer and beat detection
+    // Initialize audio context for visualizer
     function initAudioContext() {
         try {
+            // Older browsers might use webkitAudioContext
             const AudioContext = window.AudioContext || window.webkitAudioContext;
             audioContext = new AudioContext();
             
@@ -897,59 +896,14 @@
             analyser = audioContext.createAnalyser();
             analyser.fftSize = 256;
             
-            // Create beat detector
-            beatDetector = audioContext.createAnalyser();
-            beatDetector.fftSize = 512;
-            
-            // Create EQ nodes
-            const splitter = audioContext.createChannelSplitter(2);
-            const merger = audioContext.createChannelMerger(2);
-            
-            // Create filters for EQ
-            const bassFilter = audioContext.createBiquadFilter();
-            bassFilter.type = "lowshelf";
-            bassFilter.frequency.value = 250;
-            
-            const midFilter = audioContext.createBiquadFilter();
-            midFilter.type = "peaking";
-            midFilter.frequency.value = 1000;
-            midFilter.Q.value = 1;
-            
-            const trebleFilter = audioContext.createBiquadFilter();
-            trebleFilter.type = "highshelf";
-            trebleFilter.frequency.value = 4000;
-            
-            // Connect nodes
-            source.connect(splitter);
-            splitter.connect(bassFilter, 0);
-            splitter.connect(midFilter, 0);
-            splitter.connect(trebleFilter, 0);
-            
-            bassFilter.connect(analyser);
-            analyser.connect(merger, 0, 0);
-            
-            midFilter.connect(analyser);
-            analyser.connect(merger, 0, 0);
-            
-            trebleFilter.connect(analyser);
-            analyser.connect(merger, 0, 0);
-            
-            trebleFilter.connect(beatDetector);
-            beatDetector.connect(merger, 0, 0);
-            
-            merger.connect(audioContext.destination);
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
             
             dataArray = new Uint8Array(analyser.frequencyBinCount);
             
-            // Store nodes for EQ control
+            // Store nodes for crossfade
             audioNodes.source = source;
             audioNodes.analyser = analyser;
-            audioNodes.bassFilter = bassFilter;
-            audioNodes.midFilter = midFilter;
-            audioNodes.trebleFilter = trebleFilter;
-            
-            // Set initial EQ to flat
-            setEQValues('flat');
         } catch (e) {
             console.error('Web Audio API not supported', e);
             visualizerToggle.disabled = true;
@@ -957,60 +911,7 @@
         }
     }
 
-    // Set EQ values based on preset
-    function setEQValues(presetName) {
-        const preset = eqPresetConfigs[presetName];
-        if (!preset || !audioNodes.bassFilter) return;
-        
-        // Convert our simple 0-6 scale to dB values (-12dB to +12dB)
-        audioNodes.bassFilter.gain.value = (preset.bass - 3) * 4;
-        audioNodes.midFilter.gain.value = (preset.mids - 3) * 4;
-        audioNodes.trebleFilter.gain.value = (preset.treble - 3) * 4;
-    }
-
-    // Detect beats from audio data
-    function detectBeat() {
-        if (!beatDetector) return false;
-        
-        const beatData = new Uint8Array(beatDetector.frequencyBinCount);
-        beatDetector.getByteFrequencyData(beatData);
-        
-        // Calculate average amplitude in the high frequency range (where beats are most noticeable)
-        let sum = 0;
-        const startBin = Math.floor(beatData.length * 0.7); // Upper 30% of frequencies
-        const endBin = beatData.length - 1;
-        
-        for (let i = startBin; i <= endBin; i++) {
-            sum += beatData[i];
-        }
-        
-        const average = sum / (endBin - startBin + 1);
-        const threshold = 1.5 * average; // Dynamic threshold
-        
-        // Check if current amplitude exceeds threshold
-        let isBeat = false;
-        for (let i = startBin; i <= endBin; i++) {
-            if (beatData[i] > threshold) {
-                isBeat = true;
-                break;
-            }
-        }
-        
-        // Calculate BPM if we have a beat
-        if (isBeat) {
-            const now = audioContext.currentTime;
-            if (lastBeatTime > 0) {
-                beatInterval = now - lastBeatTime;
-                bpm = 60 / beatInterval;
-            }
-            lastBeatTime = now;
-            beatCount++;
-        }
-        
-        return isBeat;
-    }
-
-    // Visualizer animation with beat detection
+    // Visualizer animation
     function drawVisualizer() {
         if (!isVisualizerVisible || !analyser) return;
         
@@ -1022,139 +923,64 @@
         const barWidth = (visualizerCanvas.width / dataArray.length) * 2.5;
         let x = 0;
         
-        // Detect beat and get current genre
-        const hasBeat = detectBeat();
-        const currentGenre = filteredSongs[currentSongIndex]?.genre || 'default';
-        
         for (let i = 0; i < dataArray.length; i++) {
-            let barHeight = dataArray[i] / 2;
+            const barHeight = dataArray[i] / 2;
             
-            // Enhance the effect when a beat is detected
-            if (hasBeat && i > dataArray.length * 0.3) {
-                barHeight *= 1.5;
-            }
-            
-            // Create gradient based on genre
-            let gradient;
-            switch(currentGenre) {
-                case 'rock':
-                    gradient = visualizerCtx.createLinearGradient(0, 0, 0, visualizerCanvas.height);
-                    gradient.addColorStop(0, '#ff0000');
-                    gradient.addColorStop(0.5, '#ff6600');
-                    gradient.addColorStop(1, '#ffcc00');
-                    break;
-                case 'pop':
-                    gradient = visualizerCtx.createLinearGradient(0, 0, 0, visualizerCanvas.height);
-                    gradient.addColorStop(0, '#00ccff');
-                    gradient.addColorStop(0.5, '#cc00ff');
-                    gradient.addColorStop(1, '#ff00cc');
-                    break;
-                case 'classical':
-                    gradient = visualizerCtx.createLinearGradient(0, 0, 0, visualizerCanvas.height);
-                    gradient.addColorStop(0, '#ffffff');
-                    gradient.addColorStop(0.5, '#99ccff');
-                    gradient.addColorStop(1, '#3366ff');
-                    break;
-                case 'electronic':
-                    gradient = visualizerCtx.createLinearGradient(0, 0, 0, visualizerCanvas.height);
-                    gradient.addColorStop(0, '#00ff00');
-                    gradient.addColorStop(0.5, '#00ffff');
-                    gradient.addColorStop(1, '#0000ff');
-                    break;
-                default: // Default/Bollywood
-                    gradient = visualizerCtx.createLinearGradient(0, 0, 0, visualizerCanvas.height);
-                    gradient.addColorStop(0, '#00ffff');
-                    gradient.addColorStop(0.5, '#cc00ff');
-                    gradient.addColorStop(1, '#ff00ff');
-            }
+            // Create gradient
+            const gradient = visualizerCtx.createLinearGradient(0, 0, 0, visualizerCanvas.height);
+            gradient.addColorStop(0, '#00ffff');
+            gradient.addColorStop(0.5, '#cc00ff');
+            gradient.addColorStop(1, '#ff00ff');
             
             visualizerCtx.fillStyle = gradient;
-            
-            // Add pulsing effect on beat
-            if (hasBeat && i % 2 === 0) {
-                const pulse = 1 + Math.sin(Date.now() / 100) * 0.2;
-                barHeight *= pulse;
-            }
-            
-            // Draw the bar with rounded corners
-            const borderRadius = 2;
-            visualizerCtx.beginPath();
-            visualizerCtx.moveTo(x + borderRadius, visualizerCanvas.height);
-            visualizerCtx.lineTo(x + borderRadius, visualizerCanvas.height - barHeight + borderRadius);
-            visualizerCtx.quadraticCurveTo(x + borderRadius, visualizerCanvas.height - barHeight, x + borderRadius * 2, visualizerCanvas.height - barHeight);
-            visualizerCtx.lineTo(x + barWidth - borderRadius * 2, visualizerCanvas.height - barHeight);
-            visualizerCtx.quadraticCurveTo(x + barWidth - borderRadius, visualizerCanvas.height - barHeight, x + barWidth - borderRadius, visualizerCanvas.height - barHeight + borderRadius);
-            visualizerCtx.lineTo(x + barWidth - borderRadius, visualizerCanvas.height);
-            visualizerCtx.closePath();
-            visualizerCtx.fill();
+            visualizerCtx.fillRect(x, visualizerCanvas.height - barHeight, barWidth, barHeight);
             
             x += barWidth + 1;
-        }
-        
-        // Draw BPM text if detected
-        if (bpm > 0) {
-            visualizerCtx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-            visualizerCtx.font = '14px Arial';
-            visualizerCtx.textAlign = 'right';
-            visualizerCtx.fillText(`${Math.round(bpm)} BPM`, visualizerCanvas.width - 10, 20);
         }
     }
 
     // Load song
     function loadSong(index) {
-        if (animationId) cancelAnimationFrame(animationId);
-        
-        const song = filteredSongs[index];
-        currentGenre = song.genre || '';
-        
-        // Set EQ based on genre
-        if (song.genre && eqPresetConfigs[song.genre]) {
-            setEQValues(song.genre);
-            highlightActiveEQPreset(song.genre);
-        } else {
-            setEQValues('flat');
-            highlightActiveEQPreset('flat');
+        // Stop current visualization
+        if (animationId) {
+            cancelAnimationFrame(animationId);
         }
         
-        // Reset beat detection
-        lastBeatTime = 0;
-        beatInterval = 0;
-        beatCount = 0;
-        bpm = 0;
+        const song = filteredSongs[index];
         
+        // Crossfade if enabled
         if (isCrossfadeEnabled && isPlaying && audio.src) {
             crossfadeToNewSong(song, index);
             return;
         }
         
+        // Normal load
         audio.src = song.url;
         updateSongInfo(song, index);
         
+        // Play the song automatically when loaded
         audio.addEventListener('canplay', function() {
-            if (isPlaying) playSong();
+            if (isPlaying) {
+                playSong();
+            }
         }, { once: true });
-    }
-
-    // Highlight active EQ preset button
-    function highlightActiveEQPreset(presetName) {
-        eqPresets.forEach(btn => {
-            btn.classList.toggle('bg-neon-blue/50', btn.dataset.preset === presetName);
-            btn.classList.toggle('bg-dark-700', btn.dataset.preset !== presetName);
-        });
     }
 
     // Crossfade to new song
     function crossfadeToNewSong(song, index) {
+        // Create new audio element for crossfade
         const newAudio = new Audio(song.url);
         newAudio.volume = 0;
         
+        // Set up new audio context
         const newSource = audioContext.createMediaElementSource(newAudio);
         const gainNode = audioContext.createGain();
         
         newSource.connect(gainNode);
         gainNode.connect(audioContext.destination);
         
-        const fadeDuration = 1;
+        // Fade out current audio and fade in new audio
+        const fadeDuration = 1; // seconds
         const fadeSteps = 20;
         const stepInterval = (fadeDuration * 1000) / fadeSteps;
         let step = 0;
@@ -1163,30 +989,43 @@
             step++;
             const progress = step / fadeSteps;
             
+            // Fade out current audio
             audio.volume = volumeBar.value * (1 - progress);
+            
+            // Fade in new audio
             newAudio.volume = volumeBar.value * progress;
             
             if (step >= fadeSteps) {
                 clearInterval(fadeInterval);
                 
+                // Update current audio to the new one
                 audio.pause();
                 audio.src = song.url;
                 audio.currentTime = 0;
                 audio.volume = volumeBar.value;
                 
-                if (audioNodes.gainNode) audioNodes.gainNode.disconnect();
+                // Disconnect old nodes
+                if (audioNodes.gainNode) {
+                    audioNodes.gainNode.disconnect();
+                }
                 
+                // Store new nodes
                 audioNodes.source = newSource;
                 audioNodes.gainNode = gainNode;
                 
+                // Update UI
                 updateSongInfo(song, index);
                 
-                if (isPlaying) audio.play().catch(e => console.error("Playback failed:", e));
+                if (isPlaying) {
+                    audio.play().catch(e => console.error("Playback failed:", e));
+                }
                 
+                // Clean up
                 newAudio.remove();
             }
         }, stepInterval);
         
+        // Start playing the new audio
         newAudio.play().catch(e => console.error("Crossfade playback failed:", e));
     }
 
@@ -1197,9 +1036,13 @@
         songArtist.textContent = song.artist;
         currentSongIndex = index;
         
+        // Update dynamic background
         updateDynamicBackground();
+        
+        // Update rating display
         updateRatingDisplay(song.title);
         
+        // Highlight current song in playlist
         const playlistItems = playlistEl.querySelectorAll('li');
         playlistItems.forEach(item => item.classList.remove('bg-neon-blue/20', 'text-neon-blue'));
         if (playlistItems[index]) {
@@ -1207,10 +1050,16 @@
             playlistItems[index].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
         
+        // Load lyrics if available
         loadLyrics(song);
+        
+        // Add to play history
         addToHistory(song);
         
-        if (isVisualizerVisible) drawVisualizer();
+        // Start visualizer if enabled
+        if (isVisualizerVisible) {
+            drawVisualizer();
+        }
     }
 
     // Update dynamic background based on album art
@@ -1220,19 +1069,23 @@
             return;
         }
         
+        // Create a temporary image to extract colors
         const img = new Image();
         img.crossOrigin = "Anonymous";
         img.src = albumArt.src;
         
         img.onload = function() {
+            // Create canvas to process image
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.width = img.width;
             canvas.height = img.height;
             ctx.drawImage(img, 0, 0);
             
+            // Get dominant color
             const color = getDominantColor(canvas);
             
+            // Apply as background with gradient
             bodyBg.style.backgroundImage = `
                 radial-gradient(circle at center, 
                 rgba(${color.r}, ${color.g}, ${color.b}, 0.3) 0%, 
@@ -1240,6 +1093,7 @@
             `;
         };
         
+        // Fallback if image fails to load
         img.onerror = function() {
             bodyBg.style.backgroundImage = 'none';
         };
@@ -1251,6 +1105,7 @@
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
         
+        // Sample pixels (every 10th pixel for performance)
         let r = 0, g = 0, b = 0, count = 0;
         
         for (let i = 0; i < data.length; i += 40) {
@@ -1260,6 +1115,7 @@
             count++;
         }
         
+        // Return average color
         return {
             r: Math.round(r / count),
             g: Math.round(g / count),
@@ -1291,6 +1147,7 @@
         const lines = lyricsDisplay.querySelectorAll('.lyrics-line');
         let activeLine = null;
         
+        // Find the current line based on time
         for (let i = lines.length - 1; i >= 0; i--) {
             const lineTime = parseFloat(lines[i].dataset.time);
             if (currentTime >= lineTime) {
@@ -1299,10 +1156,15 @@
             }
         }
         
+        // Update active line
         lines.forEach((line, index) => {
             if (index === activeLine) {
                 line.classList.add('active');
-                if (isSyncLyrics) line.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                
+                // Auto-scroll to active line in sync mode
+                if (isSyncLyrics) {
+                    line.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
             } else {
                 line.classList.remove('active');
             }
@@ -1311,7 +1173,10 @@
 
     // Add song to play history
     function addToHistory(song) {
+        // Remove if already in history
         playHistory = playHistory.filter(item => item.title !== song.title);
+        
+        // Add to beginning
         playHistory.unshift({
             title: song.title,
             artist: song.artist,
@@ -1320,8 +1185,12 @@
             timestamp: new Date().toISOString()
         });
         
-        if (playHistory.length > 10) playHistory = playHistory.slice(0, 10);
+        // Keep only last 10 items
+        if (playHistory.length > 10) {
+            playHistory = playHistory.slice(0, 10);
+        }
         
+        // Update UI and save
         renderHistory();
         saveData();
     }
@@ -1351,7 +1220,9 @@
                 if (songIndex !== -1) {
                     currentSongIndex = songIndex;
                     loadSong(currentSongIndex);
-                    if (!isPlaying) playSong();
+                    if (!isPlaying) {
+                        playSong();
+                    }
                 }
             });
             
@@ -1369,8 +1240,11 @@
 
     // Play/Pause
     function togglePlay() {
-        if (isPlaying) pauseSong();
-        else playSong();
+        if (isPlaying) {
+            pauseSong();
+        } else {
+            playSong();
+        }
     }
 
     function playSong() {
@@ -1378,6 +1252,7 @@
         document.body.classList.add('playing');
         playPauseBtn.innerHTML = '<i class="fas fa-pause text-xl text-neon-blue"></i>';
         
+        // Resume audio context if it was suspended
         if (audioContext && audioContext.state === 'suspended') {
             audioContext.resume().then(() => {
                 audio.play().catch(e => handlePlaybackError(e));
@@ -1386,14 +1261,20 @@
             audio.play().catch(e => handlePlaybackError(e));
         }
         
-        if (isVisualizerVisible) drawVisualizer();
+        // Start visualizer if enabled
+        if (isVisualizerVisible) {
+            drawVisualizer();
+        }
     }
 
     function handlePlaybackError(error) {
         console.error("Playback failed:", error);
+        // Fallback for autoplay restrictions
         playPauseBtn.innerHTML = '<i class="fas fa-play text-xl text-neon-blue"></i>';
         document.body.classList.remove('playing');
         isPlaying = false;
+        
+        // Show error message to user
         showNotification('Click the play button to start playback');
     }
 
@@ -1403,7 +1284,10 @@
         playPauseBtn.innerHTML = '<i class="fas fa-play text-xl text-neon-blue"></i>';
         audio.pause();
         
-        if (animationId) cancelAnimationFrame(animationId);
+        // Stop visualizer animation to save resources
+        if (animationId) {
+            cancelAnimationFrame(animationId);
+        }
     }
 
     // Handle song end
@@ -1419,7 +1303,9 @@
     // Previous Song
     function prevSong() {
         currentSongIndex--;
-        if (currentSongIndex < 0) currentSongIndex = filteredSongs.length - 1;
+        if (currentSongIndex < 0) {
+            currentSongIndex = filteredSongs.length - 1;
+        }
         loadSong(currentSongIndex);
     }
 
@@ -1436,7 +1322,9 @@
         }
         
         currentSongIndex++;
-        if (currentSongIndex > filteredSongs.length - 1) currentSongIndex = 0;
+        if (currentSongIndex > filteredSongs.length - 1) {
+            currentSongIndex = 0;
+        }
         loadSong(currentSongIndex);
     }
 
@@ -1456,7 +1344,11 @@
         const { currentTime, duration } = audio;
         const progressPercent = (currentTime / duration) * 100;
         progressBar.value = progressPercent;
+        
+        // Update time
         currentTimeEl.textContent = formatTime(currentTime);
+        
+        // Update lyrics highlighting
         updateLyricsHighlight(currentTime);
     }
 
@@ -1485,6 +1377,7 @@
         const volume = volumeBar.value;
         audio.volume = volume;
         
+        // Update mute state icon
         if (volume == 0) {
             volumeBar.previousElementSibling.classList.remove('fa-volume-down');
             volumeBar.previousElementSibling.classList.add('fa-volume-mute');
@@ -1500,8 +1393,9 @@
         shuffleBtn.classList.toggle('text-neon-green', isShuffle);
         shuffleBtn.classList.toggle('text-gray-400', !isShuffle);
         
-        if (isShuffle) shufflePlaylist();
-        else {
+        if (isShuffle) {
+            shufflePlaylist();
+        } else {
             filteredSongs = [...songs];
             renderPlaylist();
         }
@@ -1547,8 +1441,11 @@
         visualizerToggle.classList.toggle('text-neon-yellow', isVisualizerVisible);
         visualizerToggle.classList.toggle('text-gray-400', !isVisualizerVisible);
         
-        if (isVisualizerVisible && isPlaying) drawVisualizer();
-        else if (animationId) cancelAnimationFrame(animationId);
+        if (isVisualizerVisible && isPlaying) {
+            drawVisualizer();
+        } else if (animationId) {
+            cancelAnimationFrame(animationId);
+        }
     }
 
     // Rate song
@@ -1580,7 +1477,9 @@
         
         stars.forEach((star, index) => {
             star.classList.remove('hover', 'active');
-            if (index < currentRating) star.classList.add('active');
+            if (index < currentRating) {
+                star.classList.add('active');
+            }
         });
     }
 
@@ -1590,7 +1489,9 @@
         
         stars.forEach((star, index) => {
             star.classList.remove('active');
-            if (index < rating) star.classList.add('active');
+            if (index < rating) {
+                star.classList.add('active');
+            }
         });
     }
 
@@ -1603,11 +1504,13 @@
     function setSleepTimer(e) {
         const minutes = parseInt(e.target.dataset.minutes);
         
+        // Clear existing timer
         if (sleepTimer) {
             clearTimeout(sleepTimer);
             sleepTimer = null;
         }
         
+        // Set new timer if minutes > 0
         if (minutes > 0) {
             const ms = minutes * 60 * 1000;
             sleepTimer = setTimeout(() => {
@@ -1624,15 +1527,21 @@
             sleepTimerDisplay.textContent = 'Not set';
         }
         
+        // Close menu
         sleepTimerMenu.classList.add('hidden');
     }
 
     // Set equalizer preset
     function setEqPreset(e) {
         const preset = e.target.dataset.preset;
-        setEQValues(preset);
+        // In a real app, this would adjust the Web Audio API nodes
         showNotification(`Equalizer set to ${preset} preset`);
-        highlightActiveEQPreset(preset);
+        
+        // Highlight selected preset
+        eqPresets.forEach(btn => {
+            btn.classList.toggle('bg-neon-blue/50', btn.dataset.preset === preset);
+            btn.classList.toggle('bg-dark-700', btn.dataset.preset !== preset);
+        });
     }
 
     // Render playlist
@@ -1657,9 +1566,12 @@
             li.addEventListener('click', () => {
                 currentSongIndex = index;
                 loadSong(currentSongIndex);
-                if (!isPlaying) playSong();
+                if (!isPlaying) {
+                    playSong();
+                }
             });
             
+            // Add to queue on right click
             li.addEventListener('contextmenu', (e) => {
                 e.preventDefault();
                 addToQueue(song);
@@ -1675,6 +1587,8 @@
         if (!queue.some(item => item.title === song.title)) {
             queue.push(song);
             renderQueue();
+            
+            // Show notification
             showNotification(`Added "${song.title}" to queue`);
         }
     }
@@ -1687,10 +1601,12 @@
             return;
         }
         
+        // Make queue sortable
         new Sortable(queueList, {
             animation: 150,
             handle: '.drag-handle',
             onEnd: function() {
+                // Update queue order
                 const items = queueList.querySelectorAll('li');
                 const newQueue = [];
                 
@@ -1719,6 +1635,7 @@
             queueList.appendChild(li);
         });
         
+        // Add event listeners to remove buttons
         document.querySelectorAll('.remove-from-queue').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1741,6 +1658,7 @@
         filteredSongs.sort((a, b) => a.title.localeCompare(b.title));
         renderPlaylist();
         
+        // Update current song index
         const currentSong = songs[currentSongIndex];
         currentSongIndex = filteredSongs.findIndex(song => song.title === currentSong.title);
         
@@ -1750,14 +1668,17 @@
     // Toggle search
     function toggleSearch() {
         searchContainer.classList.toggle('hidden');
-        if (!searchContainer.classList.contains('hidden')) searchInput.focus();
+        if (!searchContainer.classList.contains('hidden')) {
+            searchInput.focus();
+        }
     }
 
     // Filter songs
     function filterSongs() {
         const searchTerm = searchInput.value.toLowerCase();
-        if (searchTerm === '') filteredSongs = [...songs];
-        else {
+        if (searchTerm === '') {
+            filteredSongs = [...songs];
+        } else {
             filteredSongs = songs.filter(song => 
                 song.title.toLowerCase().includes(searchTerm) || 
                 song.artist.toLowerCase().includes(searchTerm)
@@ -1842,6 +1763,7 @@
             userPlaylists.appendChild(li);
         });
         
+        // Add event listeners
         document.querySelectorAll('.load-playlist').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -1882,10 +1804,12 @@
     function loadPlaylist(name) {
         if (!userCreatedPlaylists[name]) return;
         
+        // Set current playlist
         currentPlaylist = name;
         currentPlaylistName.textContent = name;
         currentPlaylistSection.classList.remove('hidden');
         
+        // Show notification
         showNotification(`Playlist "${name}" loaded`);
     }
 
@@ -1901,6 +1825,7 @@
             return;
         }
         
+        // Save queue to playlist
         userCreatedPlaylists[currentPlaylist] = [...queue];
         saveData();
         
@@ -1974,17 +1899,20 @@
             try {
                 const data = JSON.parse(e.target.result);
                 
+                // Validate data structure
                 if (data.ratings && data.history && data.playlists && data.settings) {
                     songRatings = data.ratings;
                     playHistory = data.history;
                     userCreatedPlaylists = data.playlists;
                     
+                    // Update settings
                     isDynamicBgEnabled = data.settings.dynamicBg !== false;
                     isCrossfadeEnabled = data.settings.crossfade || false;
                     
                     dynamicBgToggle.checked = isDynamicBgEnabled;
                     crossfadeToggle.checked = isCrossfadeEnabled;
                     
+                    // Update UI
                     updateRatingDisplay(document.getElementById('song-title').textContent);
                     renderHistory();
                     renderUserPlaylists();
@@ -2001,51 +1929,65 @@
         };
         reader.readAsText(file);
         
+        // Reset file input
         importFileInput.value = '';
     }
 
     // Handle keyboard shortcuts
     function handleKeyboardShortcuts(e) {
+        // Ignore if typing in an input field
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
         
         switch (e.key.toLowerCase()) {
             case ' ':
+                // Space to play/pause
                 e.preventDefault();
                 togglePlay();
                 break;
             case 'arrowright':
+                // Right arrow for next
                 e.preventDefault();
                 nextSong();
                 break;
             case 'arrowleft':
+                // Left arrow for previous
                 e.preventDefault();
                 prevSong();
                 break;
             case 'arrowup':
+                // Up arrow for volume up
                 e.preventDefault();
                 volumeBar.value = Math.min(1, parseFloat(volumeBar.value) + 0.05);
                 setVolume();
                 break;
             case 'arrowdown':
+                // Down arrow for volume down
                 e.preventDefault();
                 volumeBar.value = Math.max(0, parseFloat(volumeBar.value) - 0.05);
                 setVolume();
                 break;
             case 'm':
+                // M to mute/unmute
                 e.preventDefault();
-                if (audio.volume > 0) volumeBar.value = 0;
-                else volumeBar.value = 0.7;
+                if (audio.volume > 0) {
+                    volumeBar.value = 0;
+                } else {
+                    volumeBar.value = 0.7;
+                }
                 setVolume();
                 break;
             case 'l':
+                // L to toggle lyrics
                 e.preventDefault();
                 toggleLyrics();
                 break;
             case 's':
+                // S to toggle shuffle
                 e.preventDefault();
                 toggleShuffle();
                 break;
             case 'r':
+                // R to toggle repeat
                 e.preventDefault();
                 toggleRepeat();
                 break;
