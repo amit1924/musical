@@ -1,0 +1,1979 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KK Music Player</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css" rel="stylesheet">
+    <!-- Using Tailwind CSS via CDN for development only -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.14.0/Sortable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        neon: {
+                            pink: '#ff00ff',
+                            blue: '#00ffff',
+                            purple: '#cc00ff',
+                            green: '#00ff99',
+                            yellow: '#ffff00',
+                        },
+                        dark: {
+                            900: '#0a0a0a',
+                            800: '#1a1a1a',
+                            700: '#2a2a2a',
+                            600: '#3a3a3a',
+                        }
+                    },
+                    animation: {
+                        'spin-slow': 'spin 3s linear infinite',
+                        'pulse-slow': 'pulse 5s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'wave': 'wave 1.5s ease-in-out infinite',
+                        'fade-in': 'fadeIn 0.3s ease-in',
+                        'slide-up': 'slideUp 0.3s ease-out',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        wave: {
+                            '0%, 100%': { transform: 'rotate(0deg)' },
+                            '25%': { transform: 'rotate(5deg)' },
+                            '75%': { transform: 'rotate(-5deg)' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { transform: 'translateY(20px)', opacity: '0' },
+                            '100%': { transform: 'translateY(0)', opacity: '1' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .equalizer-bar {
+            animation: equalize 1.5s infinite ease-in-out;
+            transform-origin: bottom;
+        }
+        
+        .equalizer-bar:nth-child(1) { animation-delay: 0.1s; height: 10px; }
+        .equalizer-bar:nth-child(2) { animation-delay: 0.3s; height: 20px; }
+        .equalizer-bar:nth-child(3) { animation-delay: 0.5s; height: 30px; }
+        .equalizer-bar:nth-child(4) { animation-delay: 0.2s; height: 15px; }
+        .equalizer-bar:nth-child(5) { animation-delay: 0.4s; height: 25px; }
+        
+        @keyframes equalize {
+            0%, 100% { transform: scaleY(0.3); }
+            50% { transform: scaleY(1); }
+        }
+        
+        .vinyl {
+            animation: spin 20s linear infinite;
+            animation-play-state: paused;
+        }
+        
+        .playing .vinyl {
+            animation-play-state: running;
+        }
+        
+        .progress-bar {
+            -webkit-appearance: none;
+            height: 6px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .progress-bar::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 0;
+            height: 0;
+            box-shadow: -1000px 0 0 1000px rgba(0, 255, 255, 0.7);
+        }
+        
+        .volume-bar::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            background: #00ffff;
+            cursor: pointer;
+        }
+        
+        .song-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0, 255, 255, 0.3);
+        }
+        
+        .glow-text {
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.7);
+        }
+        
+        .neon-border {
+            box-shadow: 0 0 10px rgba(0, 255, 255, 0.5), 
+                        inset 0 0 10px rgba(0, 255, 255, 0.3);
+        }
+        
+        .star-rating {
+            color: #666;
+        }
+        
+        .star-rating .star {
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        
+        .star-rating .star:hover,
+        .star-rating .star.active {
+            color: #ffcc00;
+        }
+        
+        .visualizer-container {
+            position: relative;
+            height: 100px;
+            width: 100%;
+            overflow: hidden;
+        }
+        
+        #audio-visualizer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        
+        .lyrics-line {
+            transition: all 0.3s ease;
+        }
+        
+        .lyrics-line.active {
+            color: #00ffff;
+            font-size: 1.1em;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+        
+        .drag-handle {
+            cursor: move;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        
+        .drag-handle:hover {
+            opacity: 1;
+        }
+        
+        .bg-dynamic {
+            background-size: cover;
+            background-position: center;
+            transition: background-image 0.5s ease-in-out;
+        }
+        
+        .bg-overlay {
+            background-color: rgba(10, 10, 10, 0.85);
+        }
+        
+        /* For the sleep timer dropdown */
+        .dropdown-enter {
+            animation: fadeIn 0.2s ease-out;
+        }
+        
+        .dropdown-exit {
+            animation: fadeIn 0.2s ease-out reverse;
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #3a3a3a;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00ffff;
+        }
+    </style>
+</head>
+<body class="bg-dark-900 text-gray-100 min-h-screen flex flex-col bg-dynamic">
+    <div class="bg-overlay absolute inset-0 -z-10"></div>
+    
+    <!-- Header -->
+    <header class="bg-dark-800 py-4 px-6 shadow-lg neon-border sticky top-0 z-10">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fas fa-music text-neon-blue text-2xl"></i>
+                <h1 class="text-2xl font-bold glow-text">KK Music</h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <button id="lyrics-toggle" class="p-2 rounded-full hover:bg-dark-700 transition" title="Toggle Lyrics">
+                    <i class="fas fa-align-left text-neon-green text-xl"></i>
+                </button>
+                <button id="visualizer-toggle" class="p-2 rounded-full hover:bg-dark-700 transition" title="Toggle Visualizer">
+                    <i class="fas fa-wave-square text-neon-yellow text-xl"></i>
+                </button>
+                <button id="theme-toggle" class="p-2 rounded-full hover:bg-dark-700 transition" title="Toggle Theme">
+                    <i class="fas fa-moon text-neon-purple text-xl"></i>
+                </button>
+                <button id="settings-btn" class="p-2 rounded-full hover:bg-dark-700 transition" title="Settings">
+                    <i class="fas fa-cog text-neon-green text-xl"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 container mx-auto px-4 py-6 flex flex-col lg:flex-row gap-6">
+        <!-- Player Section -->
+        <section class="lg:w-2/3 bg-dark-800 rounded-xl p-6 neon-border">
+            <!-- Visualizer -->
+            <div id="visualizer-container" class="visualizer-container mb-6 rounded-lg overflow-hidden hidden">
+                <canvas id="audio-visualizer"></canvas>
+            </div>
+            
+            <div class="flex flex-col md:flex-row items-center gap-6">
+                <!-- Album Art -->
+                <div class="relative group">
+                    <div class="absolute inset-0 bg-neon-blue rounded-full opacity-0 group-hover:opacity-20 blur-md transition-opacity duration-300"></div>
+                    <div class="relative z-10">
+                        <div class="w-48 h-48 md:w-64 md:h-64 rounded-full overflow-hidden border-4 border-neon-blue/30 relative">
+                            <img id="album-art" src="KKK.jpg" alt="Album Art" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 flex items-center justify-center vinyl">
+                                <div class="w-24 h-24 md:w-32 md:h-32 rounded-full bg-black border-4 border-gray-700 flex items-center justify-center">
+                                    <div class="w-8 h-8 rounded-full bg-neon-pink"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Song Info -->
+                <div class="flex-1 text-center md:text-left mt-4 md:mt-0">
+                    <h2 id="song-title" class="text-2xl md:text-3xl font-bold mb-1 glow-text">Aankhon Me Teri</h2>
+                    <p id="song-artist" class="text-neon-blue mb-2">KK</p>
+                    
+                    <!-- Star Rating -->
+                    <div class="star-rating flex justify-center md:justify-start mb-3" id="song-rating">
+                        <i class="fas fa-star star" data-rating="1"></i>
+                        <i class="fas fa-star star" data-rating="2"></i>
+                        <i class="fas fa-star star" data-rating="3"></i>
+                        <i class="fas fa-star star" data-rating="4"></i>
+                        <i class="fas fa-star star" data-rating="5"></i>
+                    </div>
+                    
+                    <!-- Progress Bar -->
+                    <div class="mb-4">
+                        <div class="flex justify-between text-sm text-gray-400 mb-1">
+                            <span id="current-time">0:00</span>
+                            <span id="duration">0:00</span>
+                        </div>
+                        <input type="range" id="progress-bar" class="progress-bar w-full cursor-pointer" value="0" min="0">
+                    </div>
+                    
+                    <!-- Controls -->
+                    <div class="flex justify-center md:justify-start items-center space-x-6 mb-6">
+                        <button id="shuffle" class="text-gray-400 hover:text-neon-green transition" title="Shuffle">
+                            <i class="fas fa-random text-xl"></i>
+                        </button>
+                        <button id="prev" class="text-2xl hover:text-neon-blue transition" title="Previous">
+                            <i class="fas fa-step-backward"></i>
+                        </button>
+                        <button id="play-pause" class="w-12 h-12 rounded-full bg-neon-blue/20 border-2 border-neon-blue flex items-center justify-center hover:bg-neon-blue/30 transition" title="Play/Pause">
+                            <i class="fas fa-play text-xl text-neon-blue"></i>
+                        </button>
+                        <button id="next" class="text-2xl hover:text-neon-blue transition" title="Next">
+                            <i class="fas fa-step-forward"></i>
+                        </button>
+                        <button id="repeat" class="text-gray-400 hover:text-neon-purple transition" title="Repeat">
+                            <i class="fas fa-redo text-xl"></i>
+                        </button>
+                        <div class="relative group">
+                            <button id="sleep-timer-btn" class="text-gray-400 hover:text-neon-yellow transition" title="Sleep Timer">
+                                <i class="fas fa-clock text-xl"></i>
+                            </button>
+                            <div id="sleep-timer-menu" class="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block hover:block bg-dark-700 rounded-lg shadow-lg p-2 w-40">
+                                <p class="text-xs text-gray-300 mb-2 px-2">Stop playback after:</p>
+                                <button class="sleep-option w-full text-left px-3 py-1 hover:bg-dark-600 rounded" data-minutes="0">Off</button>
+                                <button class="sleep-option w-full text-left px-3 py-1 hover:bg-dark-600 rounded" data-minutes="15">15 minutes</button>
+                                <button class="sleep-option w-full text-left px-3 py-1 hover:bg-dark-600 rounded" data-minutes="30">30 minutes</button>
+                                <button class="sleep-option w-full text-left px-3 py-1 hover:bg-dark-600 rounded" data-minutes="45">45 minutes</button>
+                                <button class="sleep-option w-full text-left px-3 py-1 hover:bg-dark-600 rounded" data-minutes="60">60 minutes</button>
+                                <div class="text-xs text-gray-400 mt-2 px-2" id="sleep-timer-display">Not set</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Volume -->
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-volume-down text-neon-blue"></i>
+                        <input type="range" id="volume-bar" class="volume-bar flex-1 h-1 bg-gray-600 rounded-lg appearance-none cursor-pointer" min="0" max="1" step="0.01" value="0.7">
+                        <i class="fas fa-volume-up text-neon-blue"></i>
+                    </div>
+                    
+                    <!-- Equalizer Presets -->
+                    <div class="mt-4">
+                        <p class="text-sm text-gray-400 mb-1">Equalizer:</p>
+                        <div class="flex flex-wrap gap-2">
+                            <button class="eq-preset px-2 py-1 text-xs rounded bg-dark-700 hover:bg-neon-blue/20" data-preset="flat">Flat</button>
+                            <button class="eq-preset px-2 py-1 text-xs rounded bg-dark-700 hover:bg-neon-blue/20" data-preset="pop">Pop</button>
+                            <button class="eq-preset px-2 py-1 text-xs rounded bg-dark-700 hover:bg-neon-blue/20" data-preset="rock">Rock</button>
+                            <button class="eq-preset px-2 py-1 text-xs rounded bg-dark-700 hover:bg-neon-blue/20" data-preset="jazz">Jazz</button>
+                            <button class="eq-preset px-2 py-1 text-xs rounded bg-dark-700 hover:bg-neon-blue/20" data-preset="classical">Classical</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Equalizer -->
+            <div class="mt-8 flex justify-center space-x-1 h-12 items-end">
+                <div class="equalizer-bar w-2 bg-neon-pink rounded-t"></div>
+                <div class="equalizer-bar w-2 bg-neon-blue rounded-t"></div>
+                <div class="equalizer-bar w-2 bg-neon-purple rounded-t"></div>
+                <div class="equalizer-bar w-2 bg-neon-green rounded-t"></div>
+                <div class="equalizer-bar w-2 bg-neon-pink rounded-t"></div>
+            </div>
+            
+            <!-- Lyrics Container -->
+            <div id="lyrics-container" class="mt-6 hidden">
+                <div class="flex justify-between items-center mb-2">
+                    <h3 class="font-medium glow-text">Lyrics</h3>
+                    <button id="sync-lyrics" class="text-xs bg-neon-blue/20 px-2 py-1 rounded hover:bg-neon-blue/30">Sync Mode</button>
+                </div>
+                <div id="lyrics-display" class="h-48 overflow-y-auto text-center space-y-2 text-gray-300 p-2 bg-dark-700 rounded-lg">
+                    <p>Lyrics will appear here when available</p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- Right Sidebar -->
+        <div class="lg:w-1/3 flex flex-col gap-6">
+            <!-- Playlist Section -->
+            <section class="bg-dark-800 rounded-xl p-6 neon-border overflow-hidden flex-1">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold glow-text">Playlist</h2>
+                    <div class="flex space-x-2">
+                        <button id="playlist-manage" class="px-3 py-1 bg-dark-700 rounded hover:bg-neon-blue/20 transition" title="Manage Playlists">
+                            <i class="fas fa-list"></i>
+                        </button>
+                        <button id="sort-alpha" class="px-3 py-1 bg-dark-700 rounded hover:bg-neon-blue/20 transition" title="Sort Alphabetically">
+                            <i class="fas fa-sort-alpha-down"></i>
+                        </button>
+                        <button id="search-btn" class="px-3 py-1 bg-dark-700 rounded hover:bg-neon-blue/20 transition" title="Search">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Search Bar -->
+                <div id="search-container" class="mb-4 hidden">
+                    <div class="relative">
+                        <input type="text" id="search-input" placeholder="Search songs..." class="w-full bg-dark-700 border border-gray-600 rounded-lg py-2 px-4 pl-10 focus:outline-none focus:border-neon-blue">
+                        <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+                    </div>
+                </div>
+                
+                <!-- Playlist -->
+                <div class="overflow-y-auto max-h-64 pr-2">
+                    <ul id="playlist" class="space-y-2">
+                        <!-- Songs will be added here by JavaScript -->
+                    </ul>
+                </div>
+                
+                <!-- Queue -->
+                <div class="mt-6">
+                    <div class="flex justify-between items-center mb-2">
+                        <h3 class="font-medium">Up Next</h3>
+                        <button id="clear-queue" class="text-xs text-gray-400 hover:text-neon-pink">Clear</button>
+                    </div>
+                    <ul id="queue-list" class="space-y-1 text-sm text-gray-400">
+                        <li class="px-2 py-1 rounded hover:bg-dark-700">No songs in queue</li>
+                    </ul>
+                </div>
+            </section>
+            
+            <!-- History Section -->
+            <section class="bg-dark-800 rounded-xl p-6 neon-border">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold glow-text">Recently Played</h2>
+                    <button id="clear-history" class="text-xs text-gray-400 hover:text-neon-pink">Clear</button>
+                </div>
+                <ul id="history-list" class="space-y-2 max-h-48 overflow-y-auto">
+                    <li class="text-sm text-gray-400 px-2 py-1">No recent songs</li>
+                </ul>
+            </section>
+        </div>
+    </main>
+
+    <!-- Playlist Management Modal -->
+    <div id="playlist-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-dark-800 rounded-xl p-6 w-full max-w-md neon-border">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold glow-text">Manage Playlists</h3>
+                <button id="close-playlist-modal" class="text-neon-pink hover:text-neon-purple">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Create New Playlist</label>
+                    <div class="flex space-x-2">
+                        <input type="text" id="new-playlist-name" placeholder="Playlist name" class="flex-1 bg-dark-700 border border-gray-600 rounded-lg py-2 px-4 focus:outline-none focus:border-neon-blue">
+                        <button id="create-playlist" class="bg-neon-blue/20 px-4 py-2 rounded-lg hover:bg-neon-blue/30">Create</button>
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="block text-sm text-gray-400 mb-1">Your Playlists</label>
+                    <ul id="user-playlists" class="space-y-2 max-h-48 overflow-y-auto">
+                        <!-- Playlists will be added here -->
+                    </ul>
+                </div>
+                
+                <div id="current-playlist-section" class="hidden">
+                    <label class="block text-sm text-gray-400 mb-1">Current Playlist: <span id="current-playlist-name" class="text-neon-blue"></span></label>
+                    <button id="save-to-playlist" class="bg-neon-blue/20 px-4 py-2 rounded-lg hover:bg-neon-blue/30 w-full">Save Current Queue</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-dark-800 rounded-xl p-6 w-full max-w-md neon-border">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold glow-text">Settings</h3>
+                <button id="close-settings-modal" class="text-neon-pink hover:text-neon-purple">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <h4 class="font-medium mb-2">Keyboard Shortcuts</h4>
+                    <ul class="text-sm space-y-2">
+                        <li class="flex justify-between"><span>Space</span><span>Play/Pause</span></li>
+                        <li class="flex justify-between"><span>→</span><span>Next Track</span></li>
+                        <li class="flex justify-between"><span>←</span><span>Previous Track</span></li>
+                        <li class="flex justify-between"><span>↑</span><span>Volume Up</span></li>
+                        <li class="flex justify-between"><span>↓</span><span>Volume Down</span></li>
+                        <li class="flex justify-between"><span>M</span><span>Mute</span></li>
+                        <li class="flex justify-between"><span>L</span><span>Toggle Lyrics</span></li>
+                        <li class="flex justify-between"><span>S</span><span>Shuffle</span></li>
+                        <li class="flex justify-between"><span>R</span><span>Repeat</span></li>
+                    </ul>
+                </div>
+                
+                <div>
+                    <h4 class="font-medium mb-2">Appearance</h4>
+                    <div class="flex items-center space-x-4">
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" id="dynamic-bg-toggle" class="form-checkbox rounded bg-dark-700 border-gray-600 text-neon-blue">
+                            <span>Dynamic Background</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="font-medium mb-2">Audio</h4>
+                    <div class="flex items-center space-x-4">
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" id="crossfade-toggle" class="form-checkbox rounded bg-dark-700 border-gray-600 text-neon-blue">
+                            <span>Crossfade (5s)</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div>
+                    <h4 class="font-medium mb-2">Data</h4>
+                    <button id="export-data" class="bg-neon-blue/20 px-4 py-2 rounded-lg hover:bg-neon-blue/30 mr-2">Export Data</button>
+                    <button id="import-data" class="bg-neon-blue/20 px-4 py-2 rounded-lg hover:bg-neon-blue/30">Import Data</button>
+                    <input type="file" id="import-file" class="hidden" accept=".json">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-dark-800 py-4 px-6 text-center text-gray-400 text-sm neon-border">
+        <div class="container mx-auto">
+            <p>KK Music Player &copy; 2025 | Made with <i class="fas fa-heart text-neon-pink"></i> for KK fans</p>
+            <div class="flex justify-center space-x-4 mt-2">
+                <a href="#" class="hover:text-neon-blue transition"><i class="fab fa-github"></i></a>
+                <a href="#" class="hover:text-neon-blue transition"><i class="fab fa-twitter"></i></a>
+                <a href="#" class="hover:text-neon-blue transition"><i class="fab fa-instagram"></i></a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Music data
+        const songs = [
+            { "title": "Aankhon Me Teri", "artist": "kk", "url": "KK/Aankhon Me Teri.mp3", "image": "KKK.jpg", 
+              "lyrics": [
+                {"time": 0, "text": "Aankhon mein teri"},
+                {"time": 4, "text": "Ajab si ajab si adaayein hain"},
+                {"time": 8, "text": "Dil ko bana dein jo patang sa"},
+                {"time": 12, "text": "Udne ko mere yeh chaayein hain"}
+              ] 
+            },
+            { "title": "Aaya Re", "artist": "kk", "url": "KK/Aaya Re.mp3", "image": "KKK.jpg" },
+            { "title": "Abhi Abhi", "artist": "kk", "url": "KK/abhi.mp3", "image": "KKK.jpg" },
+            { "title": "Alvida Alvida", "artist": "KK", "url": "KK/Alvida - Life In A Metro 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Are Are", "artist": "KK", "url": "KK/Are Are Are - Makkhi 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Aur Tanha ", "artist": "KK", "url": "KK/Aur Tanha - Love Aaj Kal 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Awarapan Banjarapan", "artist": "KK", "url": "KK/Awarapan Banjarapan.mp3", "image": "KKK.jpg" },
+            { "title": "Aye Bekhabar", "artist": "KK", "url": "KK/Aye Bekhabar Zeher 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Bardaasht", "artist": "KK", "url": "KK/Bardaasht.mp3", "image": "KKK.jpg" },
+            { "title": "Barhan Dil", "artist": "KK", "url": "KK/Barhaan Dil (Male Version) - Mr. Singh Mrs. Mehta 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Bas Ek Pal", "artist": "KK", "url": "KK/Bas Ek Pal - Bas Ek Pal 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Beetein Lamhe", "artist": "KK", "url": "KK/Beete Lamhe - KK_128-(DJMaza).mp3", "image": "KKK.jpg" },
+            { "title": "Beetein Lamhein", "artist": "KK", "url": "KK/Beetein Lamhein (Unplugged) KK.mp3", "image": "KKK.jpg" },
+            { "title": "Bin Tum", "artist": "KK", "url": "KK/Bin Tum.mp3", "image": "KKK.jpg" },
+            { "title": "Chand Ki Roshni", "artist": "KK", "url": "KK/Chand Ki Roshni Home Delivery 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Dil Ibadat", "artist": "KK", "url": "KK/Dil Ibaadat - Tum Mile 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Dil Ibadat", "artist": "KK", "url": "KK/Dil Ibaadat (Rock) - Tum Mile 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Dil Ki Purani Sadak Pe", "artist": "KK", "url": "KK/Dil Ki Purani Sadak - Sadak 2 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Dil Kyun Ye Mera", "artist": "KK", "url": "KK/Dil Kyun Yeh Mera - Kites 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Dilnashin Dilnashin", "artist": "KK", "url": "KK/Dilnashin Dilnashin.mp3", "image": "KKK.jpg" },
+            { "title": "Duniya Ne Dil Toda", "artist": "KK", "url": "KK/Duniya Ne Dil Toda - Showbiz 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Dus Bahane", "artist": "KK", "url": "KK/Dus Bahane.mp3", "image": "KKK.jpg" },
+            { "title": "Ek Nazar Mein Bhi", "artist": "KK", "url": "KK/Ek Nazar Mein Bhi - Taxi No. 9211 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Ek Pal Ke Liye.", "artist": "KK", "url": "KK/Ek Pal Ke Liye.mp3", "image": "KKK.jpg" },
+            { "title": "Gulon Me Rang Bhare", "artist": "KK", "url": "KK/Gulon Mein (Upbeat Version) - Sikandar 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Haan Main Jitni Martaba", "artist": "KK", "url": "KK/Haan Main Jitni Martaba - All The Best 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Haan Tu Hai", "artist": "KK", "url": "KK/Haan Tu Hain - Jannat_128-(DJMaza).mp3", "image": "KKK.jpg" },
+            { "title": "Hai Junoon", "artist": "KK", "url": "KK/Hai Junoon - New York 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Hum Rahe Ya Na Rahe ", "artist": "KK", "url": "KK/Hum Rahe Ya Na Rahe By..kk.mp3", "image": "KKK.jpg" },
+            { "title": "Humko Pyar Hua", "artist": "KK", "url": "KK/Humko Pyar Hua (Chal Chale) - Ready 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "I Am In Love", "artist": "KK", "url": "KK/I Am In Love - Once Upon A Time In Mumbaai 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Jaane Kaise", "artist": "KK", "url": "KK/Jaane Kaise - Raqeeb 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Jaane Ye Kya Hua", "artist": "KK", "url": "KK/Jaane Ye Kya Hua - Karthik Calling Karthik 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Jaavedaan Hai", "artist": "KK", "url": "KK/Jaavedaan Hai 1920 Evil Returns 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Jab Kabhi", "artist": "KK", "url": "KK/Jab Kabhi 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Jannatein Kahan", "artist": "KK", "url": "KK/Jannatein Kahan 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Jeena isi ka naam", "artist": "KK", "url": "KK/Jeena isi ka naam.mp3", "image": "KKK.jpg" },
+            { "title": "Kabhi Aayine Pe", "artist": "KK", "url": "KK/Kabhi Aayine Pe Likha Tujhe 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Kabhi Khushbo", "artist": "KK", "url": "KK/Kabhi Khushboo - Saaya 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Kahaani (Male)", "artist": "KK", "url": "KK/Kahaani (Male) - Kahaani 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Kaisa Ye Raaz Hai", "artist": "KK", "url": "KK/Kaisa Ye Raaz Hai - RAAZ - The Mystery Continues 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Kaise Bataun Tujhe", "artist": "KK", "url": "KK/Kaise Bataun Tujhe.mp3", "image": "KKK.jpg" },
+            { "title": "Kal Ki Hi Baat Hai", "artist": "KK", "url": "KK/Kal Ki Hi Baat Hai - Chhichhore 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Khuda Jaane", "artist": "KK", "url": "KK/Khuda Jaane - K.K_128-(DJMaza).mp3", "image": "KKK.jpg" },
+            { "title": "Khwabon Khwabon", "artist": "KK", "url": "KK/Khwabon Khwabon 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Main Agar", "artist": "KK", "url": "KK/Main Agar - Film Version (Tubelight) 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Kya Mujhe Pyar Hai ", "artist": "KK", "url": "KK/Kya Mujhe Pyar Hai - KK_128-(DJMaza).mp3", "image": "KKK.jpg" },
+            { "title": "Labon Ko", "artist": "KK", "url": "KK/Labon Ko.mp3", "image": "KKK.jpg" },
+            { "title": "Luk Chup Jaana", "artist": "KK", "url": "KK/Luk Chup Jaana Nazar Ko.mp3", "image": "KKK.jpg" },
+            { "title": "Main Khuda", "artist": "KK", "url": "KK/Main Khuda - Male - (Raag.Fm).mp3", "image": "KKK.jpg" },
+            { "title": "Main Kya Hoon", "artist": "KK", "url": "KK/Main Kya Hoon - Love Aaj Kal 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Maine Dil Se Kaha", "artist": "KK", "url": "KK/Maine Dil Se Kaha - Rog 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Mat Aazma Re", "artist": "KK", "url": "KK/Mat Aazma Re - Murder 3 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Mera Pehla Pehla Pyaar", "artist": "KK", "url": "KK/Mera Pehla Pehla Pyaar - MP3 - Mera Pehla Pehla Pyaar 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Mere Bina(unplugged)", "artist": "KK", "url": "KK/Mere Bina Unplugged Crook 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Mere Falak Ka", "artist": "KK", "url": "KK/Mere Palak Ka Tu Hi Sitara - Showbiz 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Meri Maa (Reprise)", "artist": "KK", "url": "KK/Meri Maa (Reprise) - Yaariyan 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Mujhe Kuch Kehna Hai ", "artist": "KK", "url": "KK/Mujhe Kuch Kehna Hai - Mujhe Kucch Kehna Hai 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Nazar Nazar", "artist": "KK", "url": "KK/Nazar Nazar - Nazar 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Nazrein kaha soti hai", "artist": "KK", "url": "KK/Nazrein kaha soti hai.mp3", "image": "KKK.jpg" },
+            { "title": "O Jaana - Tere Naam", "artist": "KK", "url": "KK/O Jaana - Tere Naam 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "O Mama", "artist": "KK", "url": "KK/O Mama - 7 Khoon Maaf 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "O meri jaan(LIM)", "artist": "KK", "url": "KK/O meri jaan(LIM).mp3", "image": "KKK.jpg" },
+            { "title": "O Meri Jaan-Tum Mile ", "artist": "KK", "url": "KK/O Meri Jaan - Tum Mile 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "O Meri Jaan(Raaz)", "artist": "KK", "url": "KK/O Meri Jaan 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Oh Lala Re", "artist": "KK", "url": "KK/Oh Lala Re - Taarzan - The Wonder Car.mp3", "image": "KKK.jpg" },
+            { "title": "Piya Aaye Na", "artist": "KK", "url": "KK/Piya Aaye Na.mp3", "image": "KKK.jpg" },
+            { "title": "Rafta Rafta ", "artist": "KK", "url": "KK/Rafta Rafta - Raaz 3 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Saanson Ke", "artist": "KK", "url": "KK/Saanson Ke.mp3", "image": "KKK.jpg" },
+            { "title": "Sach Keh Raha", "artist": "KK", "url": "KK/Sach Keh Raha Hai Deewana - KK_128-(DJMaza).mp3", "image": "KKK.jpg" },
+            { "title": "Sajde Kiye hai", "artist": "KK", "url": "KK/Sajde Ki Ye Hai Lakhoin - Khatta Meetha 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Sang Hoon Tere", "artist": "KK", "url": "KK/Sang Hoon Tere - Jannat 2_128-(DJMaza).mp3", "image": "KKK.jpg" },
+            { "title": "Soniye - Heartless", "artist": "KK", "url": "KK/Soniye - Heartless 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Soniye(Aksar)", "artist": "KK", "url": "KK/Soniye.mp3", "image": "KKK.jpg" },
+            { "title": "Tadap Tadap Ke", "artist": "KK", "url": "KK/Tadap Tadap Ke - KK_128-(DJMaza).mp3", "image": "KKK.jpg" },
+            { "title": "Tanha Tere Bagair", "artist": "KK", "url": "KK/Tanha Tere Bagair.mp3", "image": "KKK.jpg" },
+            { "title": "Tera Mera Rishta", "artist": "KK", "url": "KK/Tera Mera Rishta - Male (Jalebi) 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Tere Is Jahan Mein ", "artist": "KK", "url": "KK/Tere Is Jahan Mein - Rog 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Teri Tamanna", "artist": "KK", "url": "KK/Teri Tamanna - The Train 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Teri Yaadon Mein ", "artist": "KK", "url": "KK/Teri Yaadon Mein - KK_128-(DJMaza).mp3", "image": "KKK.jpg" },
+            { "title": "Tu Aashiqui Hai", "artist": "KK", "url": "KK/Tu Aashiqui Hai 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Tu Bhoola Jise", "artist": "KK", "url": "KK/Tu Bhoola Jise - Airlift 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Tu Jo Mila ", "artist": "KK", "url": "KK/Tu Jo Mila - KK_128-(DJMaza).mp3", "image": "KKK.jpg" },
+            { "title": "Tu Mujhe Soch Kabhi  ", "artist": "KK", "url": "KK/Tu Mujhe Soch Kabhi - Zindagi Tere Naam 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Tu Mujhse Jab Se Mila Hai", "artist": "KK", "url": "KK/Tu Mujhse Jab Se Mila Hai - Showbiz 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Tuhi Mere Hum Navaa", "artist": "KK", "url": "KK/Tuhi Mere Hum Navaa - Knockout 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Tujh Sang Lagee ", "artist": "KK", "url": "KK/Tujh Sang Lagee - Special 26 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Tujhi Mein", "artist": "KK", "url": "KK/Tujhi Mein [320 kbps].mp3", "image": "KKK.jpg" },
+            { "title": "Tum Ho Mera Pyar", "artist": "KK", "url": "KK/Tum Ho Mera Pyar - KK_128-(DJMaza).mp3", "image": "KKK.jpg" },
+            { "title": "Yaara Re Roy", "artist": "KK", "url": "KK/Yaara Re Roy 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Yaaron-Dosti", "artist": "KK", "url": "KK/Yaaron-Dosti(PaglaSongs).mp3", "image": "KKK.jpg" },
+            { "title": "Ye Fizaein", "artist": "KK", "url": "KK/Ye Fizaein - Main Hoon Na 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Yeh Kahan mil gaye", "artist": "KK", "url": "KK/Yeh Kahan Mil Gaye.mp3", "image": "KKK.jpg" },
+            { "title": "Yeh Tanhai", "artist": "KK", "url": "KK/Yeh Tanhai - Pal 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Zara Sa (Power Ballad) ", "artist": "KK", "url": "KK/Zara Sa (Power Ballad) 128 Kbps.mp3", "image": "KKK.jpg" },
+            { "title": "Zara Sa Dil Mein ", "artist": "KK", "url": "KK/Zara Sa Dil Mein De Jagah Tu_128-(DJMaza).mp3", "image": "KKK.jpg" },
+            { "title": "Zindagi Do Pal Ki ", "artist": "KK", "url": "KK/Zindagi Do Pal Ki - KK_128-(DJMaza).mp3", "image": "KKK.jpg" },
+            { "title": "Zindagi Hosh Mein", "artist": "KK", "url": "KK/Zindagi Hosh Mein.mp3", "image": "KKK.jpg" }
+        ];
+
+        // DOM Elements
+        const audio = new Audio();
+        const albumArt = document.getElementById('album-art');
+        const songTitle = document.getElementById('song-title');
+        const songArtist = document.getElementById('song-artist');
+        const currentTimeEl = document.getElementById('current-time');
+        const durationEl = document.getElementById('duration');
+        const progressBar = document.getElementById('progress-bar');
+        const playPauseBtn = document.getElementById('play-pause');
+        const prevBtn = document.getElementById('prev');
+        const nextBtn = document.getElementById('next');
+        const volumeBar = document.getElementById('volume-bar');
+        const playlistEl = document.getElementById('playlist');
+        const queueList = document.getElementById('queue-list');
+        const clearQueueBtn = document.getElementById('clear-queue');
+        const shuffleBtn = document.getElementById('shuffle');
+        const repeatBtn = document.getElementById('repeat');
+        const sortAlphaBtn = document.getElementById('sort-alpha');
+        const searchBtn = document.getElementById('search-btn');
+        const searchContainer = document.getElementById('search-container');
+        const searchInput = document.getElementById('search-input');
+        const themeToggle = document.getElementById('theme-toggle');
+        const lyricsToggle = document.getElementById('lyrics-toggle');
+        const lyricsContainer = document.getElementById('lyrics-container');
+        const lyricsDisplay = document.getElementById('lyrics-display');
+        const syncLyricsBtn = document.getElementById('sync-lyrics');
+        const visualizerToggle = document.getElementById('visualizer-toggle');
+        const visualizerContainer = document.getElementById('visualizer-container');
+        const visualizerCanvas = document.getElementById('audio-visualizer');
+        const visualizerCtx = visualizerCanvas.getContext('2d');
+        const starRating = document.getElementById('song-rating');
+        const stars = starRating.querySelectorAll('.star');
+        const sleepTimerBtn = document.getElementById('sleep-timer-btn');
+        const sleepTimerMenu = document.getElementById('sleep-timer-menu');
+        const sleepTimerOptions = document.querySelectorAll('.sleep-option');
+        const sleepTimerDisplay = document.getElementById('sleep-timer-display');
+        const eqPresets = document.querySelectorAll('.eq-preset');
+        const playlistManageBtn = document.getElementById('playlist-manage');
+        const playlistModal = document.getElementById('playlist-modal');
+        const closePlaylistModal = document.getElementById('close-playlist-modal');
+        const newPlaylistName = document.getElementById('new-playlist-name');
+        const createPlaylistBtn = document.getElementById('create-playlist');
+        const userPlaylists = document.getElementById('user-playlists');
+        const currentPlaylistSection = document.getElementById('current-playlist-section');
+        const currentPlaylistName = document.getElementById('current-playlist-name');
+        const saveToPlaylistBtn = document.getElementById('save-to-playlist');
+        const settingsBtn = document.getElementById('settings-btn');
+        const settingsModal = document.getElementById('settings-modal');
+        const closeSettingsModal = document.getElementById('close-settings-modal');
+        const dynamicBgToggle = document.getElementById('dynamic-bg-toggle');
+        const crossfadeToggle = document.getElementById('crossfade-toggle');
+        const exportDataBtn = document.getElementById('export-data');
+        const importDataBtn = document.getElementById('import-data');
+        const importFileInput = document.getElementById('import-file');
+        const historyList = document.getElementById('history-list');
+        const clearHistoryBtn = document.getElementById('clear-history');
+        const bodyBg = document.querySelector('.bg-dynamic');
+        const bodyOverlay = document.querySelector('.bg-overlay');
+
+        // App State
+        let currentSongIndex = 0;
+        let isPlaying = false;
+        let isShuffle = false;
+        let isRepeat = false;
+        let isLyricsVisible = false;
+        let isVisualizerVisible = false;
+        let isSyncLyrics = false;
+        let queue = [];
+        let filteredSongs = [...songs];
+        let audioContext;
+        let analyser;
+        let dataArray;
+        let animationId;
+        let sleepTimer = null;
+        let songRatings = {};
+        let playHistory = [];
+        let userCreatedPlaylists = {};
+        let currentPlaylist = null;
+        let isDynamicBgEnabled = true;
+        let isCrossfadeEnabled = false;
+        let audioNodes = {};
+
+        // Initialize
+        function init() {
+            // Set canvas size
+            visualizerCanvas.width = visualizerContainer.offsetWidth;
+            visualizerCanvas.height = visualizerContainer.offsetHeight;
+            
+            // Load saved data from localStorage
+            loadSavedData();
+            
+            // Render UI
+            renderPlaylist();
+            renderHistory();
+            renderUserPlaylists();
+            loadSong(currentSongIndex);
+            
+            // Initialize audio context for visualizer
+            initAudioContext();
+            
+            // Event Listeners
+            setupEventListeners();
+            
+            // Set initial volume
+            audio.volume = volumeBar.value;
+            
+            // Set initial theme
+            updateThemeIcon();
+            
+            // Set initial dynamic background
+            updateDynamicBackground();
+        }
+
+        // Load saved data from localStorage
+        function loadSavedData() {
+            // Load ratings
+            const savedRatings = localStorage.getItem('songRatings');
+            if (savedRatings) {
+                songRatings = JSON.parse(savedRatings);
+            }
+            
+            // Load play history
+            const savedHistory = localStorage.getItem('playHistory');
+            if (savedHistory) {
+                playHistory = JSON.parse(savedHistory);
+            }
+            
+            // Load playlists
+            const savedPlaylists = localStorage.getItem('userPlaylists');
+            if (savedPlaylists) {
+                userCreatedPlaylists = JSON.parse(savedPlaylists);
+            }
+            
+            // Load settings
+            const savedSettings = localStorage.getItem('playerSettings');
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                isDynamicBgEnabled = settings.dynamicBg !== false;
+                isCrossfadeEnabled = settings.crossfade || false;
+                
+                // Update UI to match settings
+                dynamicBgToggle.checked = isDynamicBgEnabled;
+                crossfadeToggle.checked = isCrossfadeEnabled;
+            }
+        }
+
+        // Save data to localStorage
+        function saveData() {
+            localStorage.setItem('songRatings', JSON.stringify(songRatings));
+            localStorage.setItem('playHistory', JSON.stringify(playHistory));
+            localStorage.setItem('userPlaylists', JSON.stringify(userCreatedPlaylists));
+            
+            // Save settings
+            const settings = {
+                dynamicBg: isDynamicBgEnabled,
+                crossfade: isCrossfadeEnabled
+            };
+            localStorage.setItem('playerSettings', JSON.stringify(settings));
+        }
+
+        // Setup event listeners
+        function setupEventListeners() {
+            // Player controls
+            playPauseBtn.addEventListener('click', togglePlay);
+            prevBtn.addEventListener('click', prevSong);
+            nextBtn.addEventListener('click', nextSong);
+            progressBar.addEventListener('input', setProgress);
+            volumeBar.addEventListener('input', setVolume);
+            audio.addEventListener('timeupdate', updateProgress);
+            audio.addEventListener('ended', handleSongEnd);
+            audio.addEventListener('loadedmetadata', updateDuration);
+            
+            // Features
+            shuffleBtn.addEventListener('click', toggleShuffle);
+            repeatBtn.addEventListener('click', toggleRepeat);
+            clearQueueBtn.addEventListener('click', clearQueue);
+            sortAlphaBtn.addEventListener('click', sortPlaylist);
+            searchBtn.addEventListener('click', toggleSearch);
+            searchInput.addEventListener('input', filterSongs);
+            themeToggle.addEventListener('click', toggleTheme);
+            lyricsToggle.addEventListener('click', toggleLyrics);
+            syncLyricsBtn.addEventListener('click', toggleSyncLyrics);
+            visualizerToggle.addEventListener('click', toggleVisualizer);
+            
+            // Star rating
+            stars.forEach(star => {
+                star.addEventListener('click', rateSong);
+                star.addEventListener('mouseover', hoverStar);
+                star.addEventListener('mouseout', resetStars);
+            });
+            
+            // Sleep timer
+            sleepTimerBtn.addEventListener('click', toggleSleepTimerMenu);
+            sleepTimerOptions.forEach(option => {
+                option.addEventListener('click', setSleepTimer);
+            });
+            
+            // Equalizer presets
+            eqPresets.forEach(preset => {
+                preset.addEventListener('click', setEqPreset);
+            });
+            
+            // Playlist management
+            playlistManageBtn.addEventListener('click', showPlaylistModal);
+            closePlaylistModal.addEventListener('click', hidePlaylistModal);
+            createPlaylistBtn.addEventListener('click', createNewPlaylist);
+            saveToPlaylistBtn.addEventListener('click', saveQueueToPlaylist);
+            
+            // Settings
+            settingsBtn.addEventListener('click', showSettingsModal);
+            closeSettingsModal.addEventListener('click', hideSettingsModal);
+            dynamicBgToggle.addEventListener('change', toggleDynamicBackground);
+            crossfadeToggle.addEventListener('change', toggleCrossfade);
+            exportDataBtn.addEventListener('click', exportData);
+            importDataBtn.addEventListener('click', triggerImport);
+            importFileInput.addEventListener('change', importData);
+            
+            // History
+            clearHistoryBtn.addEventListener('click', clearHistory);
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', handleKeyboardShortcuts);
+            
+            // Window resize
+            window.addEventListener('resize', handleResize);
+        }
+
+        // Initialize audio context for visualizer
+        function initAudioContext() {
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaElementSource(audio);
+                analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                
+                source.connect(analyser);
+                analyser.connect(audioContext.destination);
+                
+                dataArray = new Uint8Array(analyser.frequencyBinCount);
+                
+                // Store nodes for crossfade
+                audioNodes.source = source;
+                audioNodes.analyser = analyser;
+            } catch (e) {
+                console.error('Web Audio API not supported', e);
+                visualizerToggle.disabled = true;
+                visualizerToggle.title = "Visualizer not supported in your browser";
+            }
+        }
+
+        // Visualizer animation
+        function drawVisualizer() {
+            if (!isVisualizerVisible || !analyser) return;
+            
+            animationId = requestAnimationFrame(drawVisualizer);
+            
+            analyser.getByteFrequencyData(dataArray);
+            visualizerCtx.clearRect(0, 0, visualizerCanvas.width, visualizerCanvas.height);
+            
+            const barWidth = (visualizerCanvas.width / dataArray.length) * 2.5;
+            let x = 0;
+            
+            for (let i = 0; i < dataArray.length; i++) {
+                const barHeight = dataArray[i] / 2;
+                
+                // Create gradient
+                const gradient = visualizerCtx.createLinearGradient(0, 0, 0, visualizerCanvas.height);
+                gradient.addColorStop(0, '#00ffff');
+                gradient.addColorStop(0.5, '#cc00ff');
+                gradient.addColorStop(1, '#ff00ff');
+                
+                visualizerCtx.fillStyle = gradient;
+                visualizerCtx.fillRect(x, visualizerCanvas.height - barHeight, barWidth, barHeight);
+                
+                x += barWidth + 1;
+            }
+        }
+
+        // Load song
+        function loadSong(index) {
+            // Stop current visualization
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            
+            const song = filteredSongs[index];
+            
+            // Crossfade if enabled
+            if (isCrossfadeEnabled && isPlaying && audio.src) {
+                crossfadeToNewSong(song, index);
+                return;
+            }
+            
+            // Normal load
+            audio.src = song.url;
+            updateSongInfo(song, index);
+            
+            // Play the song automatically when loaded
+            audio.addEventListener('canplay', function() {
+                if (isPlaying) {
+                    playSong();
+                }
+            }, { once: true });
+        }
+
+        // Crossfade to new song
+        function crossfadeToNewSong(song, index) {
+            // Create new audio element for crossfade
+            const newAudio = new Audio(song.url);
+            newAudio.volume = 0;
+            
+            // Set up new audio context
+            const newSource = audioContext.createMediaElementSource(newAudio);
+            const gainNode = audioContext.createGain();
+            
+            newSource.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            // Fade out current audio and fade in new audio
+            const fadeDuration = 1; // seconds
+            const fadeSteps = 20;
+            const stepInterval = (fadeDuration * 1000) / fadeSteps;
+            let step = 0;
+            
+            const fadeInterval = setInterval(() => {
+                step++;
+                const progress = step / fadeSteps;
+                
+                // Fade out current audio
+                audio.volume = volumeBar.value * (1 - progress);
+                
+                // Fade in new audio
+                newAudio.volume = volumeBar.value * progress;
+                
+                if (step >= fadeSteps) {
+                    clearInterval(fadeInterval);
+                    
+                    // Update current audio to the new one
+                    audio.pause();
+                    audio.src = song.url;
+                    audio.currentTime = 0;
+                    audio.volume = volumeBar.value;
+                    
+                    // Disconnect old nodes
+                    if (audioNodes.gainNode) {
+                        audioNodes.gainNode.disconnect();
+                    }
+                    
+                    // Store new nodes
+                    audioNodes.source = newSource;
+                    audioNodes.gainNode = gainNode;
+                    
+                    // Update UI
+                    updateSongInfo(song, index);
+                    
+                    if (isPlaying) {
+                        audio.play().catch(e => console.error("Playback failed:", e));
+                    }
+                    
+                    // Clean up
+                    newAudio.remove();
+                }
+            }, stepInterval);
+            
+            // Start playing the new audio
+            newAudio.play().catch(e => console.error("Crossfade playback failed:", e));
+        }
+
+        // Update song info and UI
+        function updateSongInfo(song, index) {
+            albumArt.src = song.image;
+            songTitle.textContent = song.title;
+            songArtist.textContent = song.artist;
+            currentSongIndex = index;
+            
+            // Update dynamic background
+            updateDynamicBackground();
+            
+            // Update rating display
+            updateRatingDisplay(song.title);
+            
+            // Highlight current song in playlist
+            const playlistItems = playlistEl.querySelectorAll('li');
+            playlistItems.forEach(item => item.classList.remove('bg-neon-blue/20', 'text-neon-blue'));
+            if (playlistItems[index]) {
+                playlistItems[index].classList.add('bg-neon-blue/20', 'text-neon-blue');
+                playlistItems[index].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+            
+            // Load lyrics if available
+            loadLyrics(song);
+            
+            // Add to play history
+            addToHistory(song);
+            
+            // Start visualizer if enabled
+            if (isVisualizerVisible) {
+                drawVisualizer();
+            }
+        }
+
+        // Update dynamic background based on album art
+        function updateDynamicBackground() {
+            if (!isDynamicBgEnabled) {
+                bodyBg.style.backgroundImage = 'none';
+                return;
+            }
+            
+            // Create a temporary image to extract colors
+            const img = new Image();
+            img.crossOrigin = "Anonymous";
+            img.src = albumArt.src;
+            
+            img.onload = function() {
+                // Create canvas to process image
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                
+                // Get dominant color
+                const color = getDominantColor(canvas);
+                
+                // Apply as background with gradient
+                bodyBg.style.backgroundImage = `
+                    radial-gradient(circle at center, 
+                    rgba(${color.r}, ${color.g}, ${color.b}, 0.3) 0%, 
+                    rgba(10, 10, 10, 0.8) 70%)
+                `;
+            };
+        }
+
+        // Get dominant color from image
+        function getDominantColor(canvas) {
+            const ctx = canvas.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            
+            // Sample pixels (every 10th pixel for performance)
+            let r = 0, g = 0, b = 0, count = 0;
+            
+            for (let i = 0; i < data.length; i += 40) {
+                r += data[i];
+                g += data[i + 1];
+                b += data[i + 2];
+                count++;
+            }
+            
+            // Return average color
+            return {
+                r: Math.round(r / count),
+                g: Math.round(g / count),
+                b: Math.round(b / count)
+            };
+        }
+
+        // Load lyrics for song
+        function loadLyrics(song) {
+            if (!song.lyrics) {
+                lyricsDisplay.innerHTML = '<p class="text-gray-400">No lyrics available for this song</p>';
+                return;
+            }
+            
+            lyricsDisplay.innerHTML = '';
+            song.lyrics.forEach(line => {
+                const p = document.createElement('p');
+                p.className = 'lyrics-line';
+                p.textContent = line.text;
+                p.dataset.time = line.time;
+                lyricsDisplay.appendChild(p);
+            });
+        }
+
+        // Update lyrics highlighting based on current time
+        function updateLyricsHighlight(currentTime) {
+            if (!isLyricsVisible || !audio.currentSrc) return;
+            
+            const lines = lyricsDisplay.querySelectorAll('.lyrics-line');
+            let activeLine = null;
+            
+            // Find the current line based on time
+            for (let i = lines.length - 1; i >= 0; i--) {
+                const lineTime = parseFloat(lines[i].dataset.time);
+                if (currentTime >= lineTime) {
+                    activeLine = i;
+                    break;
+                }
+            }
+            
+            // Update active line
+            lines.forEach((line, index) => {
+                if (index === activeLine) {
+                    line.classList.add('active');
+                    
+                    // Auto-scroll to active line in sync mode
+                    if (isSyncLyrics) {
+                        line.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                } else {
+                    line.classList.remove('active');
+                }
+            });
+        }
+
+        // Add song to play history
+        function addToHistory(song) {
+            // Remove if already in history
+            playHistory = playHistory.filter(item => item.title !== song.title);
+            
+            // Add to beginning
+            playHistory.unshift({
+                title: song.title,
+                artist: song.artist,
+                image: song.image,
+                url: song.url,
+                timestamp: new Date().toISOString()
+            });
+            
+            // Keep only last 10 items
+            if (playHistory.length > 10) {
+                playHistory = playHistory.slice(0, 10);
+            }
+            
+            // Update UI and save
+            renderHistory();
+            saveData();
+        }
+
+        // Render play history
+        function renderHistory() {
+            historyList.innerHTML = '';
+            
+            if (playHistory.length === 0) {
+                historyList.innerHTML = '<li class="text-sm text-gray-400 px-2 py-1">No recent songs</li>';
+                return;
+            }
+            
+            playHistory.forEach((song, index) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center space-x-3 p-2 rounded hover:bg-dark-700 cursor-pointer';
+                li.innerHTML = `
+                    <img src="${song.image}" alt="${song.title}" class="w-10 h-10 rounded">
+                    <div class="flex-1 min-w-0">
+                        <p class="truncate font-medium">${song.title}</p>
+                        <p class="truncate text-xs text-gray-400">${song.artist}</p>
+                    </div>
+                `;
+                
+                li.addEventListener('click', () => {
+                    const songIndex = filteredSongs.findIndex(s => s.title === song.title);
+                    if (songIndex !== -1) {
+                        currentSongIndex = songIndex;
+                        loadSong(currentSongIndex);
+                        if (!isPlaying) {
+                            playSong();
+                        }
+                    }
+                });
+                
+                historyList.appendChild(li);
+            });
+        }
+
+        // Clear play history
+        function clearHistory() {
+            playHistory = [];
+            renderHistory();
+            saveData();
+            showNotification('Play history cleared');
+        }
+
+        // Play/Pause
+        function togglePlay() {
+            if (isPlaying) {
+                pauseSong();
+            } else {
+                playSong();
+            }
+        }
+
+        function playSong() {
+            isPlaying = true;
+            document.body.classList.add('playing');
+            playPauseBtn.innerHTML = '<i class="fas fa-pause text-xl text-neon-blue"></i>';
+            audio.play().catch(e => {
+                console.error("Playback failed:", e);
+                // Fallback for autoplay restrictions
+                playPauseBtn.innerHTML = '<i class="fas fa-play text-xl text-neon-blue"></i>';
+                document.body.classList.remove('playing');
+                isPlaying = false;
+            });
+            
+            // Start visualizer if enabled
+            if (isVisualizerVisible) {
+                drawVisualizer();
+            }
+        }
+
+        function pauseSong() {
+            isPlaying = false;
+            document.body.classList.remove('playing');
+            playPauseBtn.innerHTML = '<i class="fas fa-play text-xl text-neon-blue"></i>';
+            audio.pause();
+            
+            // Stop visualizer animation to save resources
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+        }
+
+        // Handle song end
+        function handleSongEnd() {
+            if (isRepeat) {
+                audio.currentTime = 0;
+                audio.play().catch(e => console.error("Playback failed:", e));
+            } else {
+                nextSong();
+            }
+        }
+
+        // Previous Song
+        function prevSong() {
+            currentSongIndex--;
+            if (currentSongIndex < 0) {
+                currentSongIndex = filteredSongs.length - 1;
+            }
+            loadSong(currentSongIndex);
+        }
+
+        // Next Song
+        function nextSong() {
+            if (queue.length > 0) {
+                playFromQueue();
+                return;
+            }
+            
+            if (isRepeat) {
+                loadSong(currentSongIndex);
+                return;
+            }
+            
+            currentSongIndex++;
+            if (currentSongIndex > filteredSongs.length - 1) {
+                currentSongIndex = 0;
+            }
+            loadSong(currentSongIndex);
+        }
+
+        // Play from queue
+        function playFromQueue() {
+            const nextSongIndex = filteredSongs.findIndex(song => song.title === queue[0].title);
+            if (nextSongIndex !== -1) {
+                currentSongIndex = nextSongIndex;
+                loadSong(currentSongIndex);
+                queue.shift();
+                renderQueue();
+            }
+        }
+
+        // Update progress bar
+        function updateProgress() {
+            const { currentTime, duration } = audio;
+            const progressPercent = (currentTime / duration) * 100;
+            progressBar.value = progressPercent;
+            
+            // Update time
+            currentTimeEl.textContent = formatTime(currentTime);
+            
+            // Update lyrics highlighting
+            updateLyricsHighlight(currentTime);
+        }
+
+        // Update duration
+        function updateDuration() {
+            durationEl.textContent = formatTime(audio.duration);
+        }
+
+        // Format time
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return "0:00";
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        }
+
+        // Set progress
+        function setProgress() {
+            const progress = progressBar.value;
+            const duration = audio.duration;
+            audio.currentTime = (progress / 100) * duration;
+        }
+
+        // Set volume
+        function setVolume() {
+            const volume = volumeBar.value;
+            audio.volume = volume;
+            
+            // Update mute state icon
+            if (volume == 0) {
+                volumeBar.previousElementSibling.classList.remove('fa-volume-down');
+                volumeBar.previousElementSibling.classList.add('fa-volume-mute');
+            } else {
+                volumeBar.previousElementSibling.classList.remove('fa-volume-mute');
+                volumeBar.previousElementSibling.classList.add('fa-volume-down');
+            }
+        }
+
+        // Toggle shuffle
+        function toggleShuffle() {
+            isShuffle = !isShuffle;
+            shuffleBtn.classList.toggle('text-neon-green', isShuffle);
+            shuffleBtn.classList.toggle('text-gray-400', !isShuffle);
+            
+            if (isShuffle) {
+                shufflePlaylist();
+            } else {
+                filteredSongs = [...songs];
+                renderPlaylist();
+            }
+        }
+
+        // Shuffle playlist
+        function shufflePlaylist() {
+            const shuffled = [...filteredSongs];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            filteredSongs = shuffled;
+            renderPlaylist();
+        }
+
+        // Toggle repeat
+        function toggleRepeat() {
+            isRepeat = !isRepeat;
+            repeatBtn.classList.toggle('text-neon-purple', isRepeat);
+            repeatBtn.classList.toggle('text-gray-400', !isRepeat);
+        }
+
+        // Toggle lyrics display
+        function toggleLyrics() {
+            isLyricsVisible = !isLyricsVisible;
+            lyricsContainer.classList.toggle('hidden');
+            lyricsToggle.classList.toggle('text-neon-green', isLyricsVisible);
+            lyricsToggle.classList.toggle('text-gray-400', !isLyricsVisible);
+        }
+
+        // Toggle lyrics sync mode
+        function toggleSyncLyrics() {
+            isSyncLyrics = !isSyncLyrics;
+            syncLyricsBtn.classList.toggle('bg-neon-blue', isSyncLyrics);
+            syncLyricsBtn.classList.toggle('bg-dark-700', !isSyncLyrics);
+        }
+
+        // Toggle visualizer
+        function toggleVisualizer() {
+            isVisualizerVisible = !isVisualizerVisible;
+            visualizerContainer.classList.toggle('hidden');
+            visualizerToggle.classList.toggle('text-neon-yellow', isVisualizerVisible);
+            visualizerToggle.classList.toggle('text-gray-400', !isVisualizerVisible);
+            
+            if (isVisualizerVisible && isPlaying) {
+                drawVisualizer();
+            } else if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+        }
+
+        // Rate song
+        function rateSong(e) {
+            const rating = parseInt(e.target.dataset.rating);
+            const songTitle = document.getElementById('song-title').textContent;
+            
+            songRatings[songTitle] = rating;
+            updateRatingDisplay(songTitle);
+            saveData();
+            
+            showNotification(`Rated "${songTitle}" ${rating} star${rating > 1 ? 's' : ''}`);
+        }
+
+        // Hover star
+        function hoverStar(e) {
+            const hoverRating = parseInt(e.target.dataset.rating);
+            resetStars();
+            
+            for (let i = 0; i < hoverRating; i++) {
+                stars[i].classList.add('hover');
+            }
+        }
+
+        // Reset stars to current rating
+        function resetStars() {
+            const songTitle = document.getElementById('song-title').textContent;
+            const currentRating = songRatings[songTitle] || 0;
+            
+            stars.forEach((star, index) => {
+                star.classList.remove('hover', 'active');
+                if (index < currentRating) {
+                    star.classList.add('active');
+                }
+            });
+        }
+
+        // Update star rating display
+        function updateRatingDisplay(songTitle) {
+            const rating = songRatings[songTitle] || 0;
+            
+            stars.forEach((star, index) => {
+                star.classList.remove('active');
+                if (index < rating) {
+                    star.classList.add('active');
+                }
+            });
+        }
+
+        // Toggle sleep timer menu
+        function toggleSleepTimerMenu() {
+            sleepTimerMenu.classList.toggle('hidden');
+        }
+
+        // Set sleep timer
+        function setSleepTimer(e) {
+            const minutes = parseInt(e.target.dataset.minutes);
+            
+            // Clear existing timer
+            if (sleepTimer) {
+                clearTimeout(sleepTimer);
+                sleepTimer = null;
+            }
+            
+            // Set new timer if minutes > 0
+            if (minutes > 0) {
+                const ms = minutes * 60 * 1000;
+                sleepTimer = setTimeout(() => {
+                    pauseSong();
+                    showNotification(`Sleep timer stopped playback`);
+                    sleepTimerDisplay.textContent = 'Not set';
+                }, ms);
+                
+                const endTime = new Date(Date.now() + ms);
+                sleepTimerDisplay.textContent = `Until ${endTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+                
+                showNotification(`Sleep timer set for ${minutes} minute${minutes > 1 ? 's' : ''}`);
+            } else {
+                sleepTimerDisplay.textContent = 'Not set';
+            }
+            
+            // Close menu
+            sleepTimerMenu.classList.add('hidden');
+        }
+
+        // Set equalizer preset
+        function setEqPreset(e) {
+            const preset = e.target.dataset.preset;
+            // In a real app, this would adjust the Web Audio API nodes
+            showNotification(`Equalizer set to ${preset} preset`);
+            
+            // Highlight selected preset
+            eqPresets.forEach(btn => {
+                btn.classList.toggle('bg-neon-blue/50', btn.dataset.preset === preset);
+                btn.classList.toggle('bg-dark-700', btn.dataset.preset !== preset);
+            });
+        }
+
+        // Render playlist
+        function renderPlaylist() {
+            playlistEl.innerHTML = '';
+            filteredSongs.forEach((song, index) => {
+                const li = document.createElement('li');
+                li.className = `flex items-center justify-between p-2 rounded-lg cursor-pointer hover:bg-dark-700 transition ${index === currentSongIndex ? 'bg-neon-blue/20 text-neon-blue' : ''}`;
+                li.innerHTML = `
+                    <div class="flex items-center space-x-3">
+                        <i class="fas fa-music text-gray-400"></i>
+                        <div>
+                            <p class="font-medium truncate max-w-xs">${song.title}</p>
+                            <p class="text-xs text-gray-400 truncate max-w-xs">${song.artist}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        ${songRatings[song.title] ? `<span class="text-xs text-yellow-400">${'★'.repeat(songRatings[song.title])}${'☆'.repeat(5 - songRatings[song.title])}</span>` : ''}
+                        <span class="text-xs text-gray-500">3:45</span>
+                    </div>
+                `;
+                li.addEventListener('click', () => {
+                    currentSongIndex = index;
+                    loadSong(currentSongIndex);
+                    if (!isPlaying) {
+                        playSong();
+                    }
+                });
+                
+                // Add to queue on right click
+                li.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    addToQueue(song);
+                    return false;
+                });
+                
+                playlistEl.appendChild(li);
+            });
+        }
+
+        // Add to queue
+        function addToQueue(song) {
+            if (!queue.some(item => item.title === song.title)) {
+                queue.push(song);
+                renderQueue();
+                
+                // Show notification
+                showNotification(`Added "${song.title}" to queue`);
+            }
+        }
+
+        // Render queue
+        function renderQueue() {
+            queueList.innerHTML = '';
+            if (queue.length === 0) {
+                queueList.innerHTML = '<li class="px-2 py-1 rounded hover:bg-dark-700">No songs in queue</li>';
+                return;
+            }
+            
+            // Make queue sortable
+            new Sortable(queueList, {
+                animation: 150,
+                handle: '.drag-handle',
+                onEnd: function() {
+                    // Update queue order
+                    const items = queueList.querySelectorAll('li');
+                    const newQueue = [];
+                    
+                    items.forEach(item => {
+                        const title = item.querySelector('span').textContent.replace(/^\d+\.\s/, '');
+                        const song = queue.find(s => s.title === title);
+                        if (song) newQueue.push(song);
+                    });
+                    
+                    queue = newQueue;
+                }
+            });
+            
+            queue.forEach((song, index) => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center justify-between px-2 py-1 rounded hover:bg-dark-700';
+                li.innerHTML = `
+                    <div class="flex items-center space-x-2 flex-1 min-w-0">
+                        <i class="fas fa-grip-lines drag-handle text-gray-500"></i>
+                        <span class="truncate">${index + 1}. ${song.title}</span>
+                    </div>
+                    <button class="text-neon-pink hover:text-neon-purple text-xs remove-from-queue" data-index="${index}">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                queueList.appendChild(li);
+            });
+            
+            // Add event listeners to remove buttons
+            document.querySelectorAll('.remove-from-queue').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    const index = parseInt(btn.dataset.index);
+                    queue.splice(index, 1);
+                    renderQueue();
+                });
+            });
+        }
+
+        // Clear queue
+        function clearQueue() {
+            queue = [];
+            renderQueue();
+            showNotification('Queue cleared');
+        }
+
+        // Sort playlist alphabetically
+        function sortPlaylist() {
+            filteredSongs.sort((a, b) => a.title.localeCompare(b.title));
+            renderPlaylist();
+            
+            // Update current song index
+            const currentSong = songs[currentSongIndex];
+            currentSongIndex = filteredSongs.findIndex(song => song.title === currentSong.title);
+            
+            showNotification('Playlist sorted alphabetically');
+        }
+
+        // Toggle search
+        function toggleSearch() {
+            searchContainer.classList.toggle('hidden');
+            if (!searchContainer.classList.contains('hidden')) {
+                searchInput.focus();
+            }
+        }
+
+        // Filter songs
+        function filterSongs() {
+            const searchTerm = searchInput.value.toLowerCase();
+            if (searchTerm === '') {
+                filteredSongs = [...songs];
+            } else {
+                filteredSongs = songs.filter(song => 
+                    song.title.toLowerCase().includes(searchTerm) || 
+                    song.artist.toLowerCase().includes(searchTerm)
+                );
+            }
+            renderPlaylist();
+        }
+
+        // Toggle theme
+        function toggleTheme() {
+            document.documentElement.classList.toggle('dark');
+            updateThemeIcon();
+            saveData();
+        }
+
+        // Update theme icon based on current theme
+        function updateThemeIcon() {
+            const icon = themeToggle.querySelector('i');
+            if (document.documentElement.classList.contains('dark')) {
+                icon.classList.remove('fa-sun');
+                icon.classList.add('fa-moon');
+                icon.classList.remove('text-yellow-400');
+                icon.classList.add('text-neon-purple');
+            } else {
+                icon.classList.remove('fa-moon');
+                icon.classList.add('fa-sun');
+                icon.classList.remove('text-neon-purple');
+                icon.classList.add('text-yellow-400');
+            }
+        }
+
+        // Toggle dynamic background
+        function toggleDynamicBackground() {
+            isDynamicBgEnabled = dynamicBgToggle.checked;
+            updateDynamicBackground();
+            saveData();
+        }
+
+        // Toggle crossfade
+        function toggleCrossfade() {
+            isCrossfadeEnabled = crossfadeToggle.checked;
+            saveData();
+            showNotification(`Crossfade ${isCrossfadeEnabled ? 'enabled' : 'disabled'}`);
+        }
+
+        // Show playlist management modal
+        function showPlaylistModal() {
+            playlistModal.classList.remove('hidden');
+            renderUserPlaylists();
+        }
+
+        // Hide playlist management modal
+        function hidePlaylistModal() {
+            playlistModal.classList.add('hidden');
+        }
+
+        // Render user playlists
+        function renderUserPlaylists() {
+            userPlaylists.innerHTML = '';
+            
+            if (Object.keys(userCreatedPlaylists).length === 0) {
+                userPlaylists.innerHTML = '<li class="text-sm text-gray-400 p-2">No playlists created yet</li>';
+                currentPlaylistSection.classList.add('hidden');
+                return;
+            }
+            
+            Object.keys(userCreatedPlaylists).forEach(playlistName => {
+                const li = document.createElement('li');
+                li.className = 'flex justify-between items-center p-2 rounded hover:bg-dark-700';
+                li.innerHTML = `
+                    <span class="truncate">${playlistName}</span>
+                    <div class="flex space-x-2">
+                        <button class="load-playlist text-xs bg-neon-blue/20 px-2 py-1 rounded hover:bg-neon-blue/30" data-name="${playlistName}">
+                            <i class="fas fa-play"></i>
+                        </button>
+                        <button class="delete-playlist text-xs bg-neon-pink/20 px-2 py-1 rounded hover:bg-neon-pink/30" data-name="${playlistName}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                `;
+                
+                userPlaylists.appendChild(li);
+            });
+            
+            // Add event listeners
+            document.querySelectorAll('.load-playlist').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    loadPlaylist(btn.dataset.name);
+                });
+            });
+            
+            document.querySelectorAll('.delete-playlist').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    deletePlaylist(btn.dataset.name);
+                });
+            });
+        }
+
+        // Create new playlist
+        function createNewPlaylist() {
+            const name = newPlaylistName.value.trim();
+            if (!name) {
+                showNotification('Please enter a playlist name');
+                return;
+            }
+            
+            if (userCreatedPlaylists[name]) {
+                showNotification('Playlist with this name already exists');
+                return;
+            }
+            
+            userCreatedPlaylists[name] = [];
+            saveData();
+            renderUserPlaylists();
+            newPlaylistName.value = '';
+            
+            showNotification(`Playlist "${name}" created`);
+        }
+
+        // Load playlist
+        function loadPlaylist(name) {
+            if (!userCreatedPlaylists[name]) return;
+            
+            // Set current playlist
+            currentPlaylist = name;
+            currentPlaylistName.textContent = name;
+            currentPlaylistSection.classList.remove('hidden');
+            
+            // Show notification
+            showNotification(`Playlist "${name}" loaded`);
+        }
+
+        // Save current queue to playlist
+        function saveQueueToPlaylist() {
+            if (!currentPlaylist) {
+                showNotification('No playlist selected');
+                return;
+            }
+            
+            if (queue.length === 0) {
+                showNotification('Queue is empty');
+                return;
+            }
+            
+            // Save queue to playlist
+            userCreatedPlaylists[currentPlaylist] = [...queue];
+            saveData();
+            
+            showNotification(`Saved ${queue.length} songs to "${currentPlaylist}"`);
+        }
+
+        // Delete playlist
+        function deletePlaylist(name) {
+            if (!confirm(`Delete playlist "${name}"?`)) return;
+            
+            delete userCreatedPlaylists[name];
+            saveData();
+            renderUserPlaylists();
+            
+            if (currentPlaylist === name) {
+                currentPlaylist = null;
+                currentPlaylistSection.classList.add('hidden');
+            }
+            
+            showNotification(`Deleted playlist "${name}"`);
+        }
+
+        // Show settings modal
+        function showSettingsModal() {
+            settingsModal.classList.remove('hidden');
+        }
+
+        // Hide settings modal
+        function hideSettingsModal() {
+            settingsModal.classList.add('hidden');
+        }
+
+        // Export data
+        function exportData() {
+            const data = {
+                ratings: songRatings,
+                history: playHistory,
+                playlists: userCreatedPlaylists,
+                settings: {
+                    dynamicBg: isDynamicBgEnabled,
+                    crossfade: isCrossfadeEnabled
+                }
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'kk-music-player-data.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showNotification('Data exported successfully');
+        }
+
+        // Trigger import file selection
+        function triggerImport() {
+            importFileInput.click();
+        }
+
+        // Import data
+        function importData(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    
+                    // Validate data structure
+                    if (data.ratings && data.history && data.playlists && data.settings) {
+                        songRatings = data.ratings;
+                        playHistory = data.history;
+                        userCreatedPlaylists = data.playlists;
+                        
+                        // Update settings
+                        isDynamicBgEnabled = data.settings.dynamicBg !== false;
+                        isCrossfadeEnabled = data.settings.crossfade || false;
+                        
+                        dynamicBgToggle.checked = isDynamicBgEnabled;
+                        crossfadeToggle.checked = isCrossfadeEnabled;
+                        
+                        // Update UI
+                        updateRatingDisplay(document.getElementById('song-title').textContent);
+                        renderHistory();
+                        renderUserPlaylists();
+                        saveData();
+                        
+                        showNotification('Data imported successfully');
+                    } else {
+                        showNotification('Invalid data format');
+                    }
+                } catch (err) {
+                    showNotification('Error importing data');
+                    console.error(err);
+                }
+            };
+            reader.readAsText(file);
+            
+            // Reset file input
+            importFileInput.value = '';
+        }
+
+        // Handle keyboard shortcuts
+        function handleKeyboardShortcuts(e) {
+            // Ignore if typing in an input field
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+            
+            switch (e.key.toLowerCase()) {
+                case ' ':
+                    // Space to play/pause
+                    e.preventDefault();
+                    togglePlay();
+                    break;
+                case 'arrowright':
+                    // Right arrow for next
+                    e.preventDefault();
+                    nextSong();
+                    break;
+                case 'arrowleft':
+                    // Left arrow for previous
+                    e.preventDefault();
+                    prevSong();
+                    break;
+                case 'arrowup':
+                    // Up arrow for volume up
+                    e.preventDefault();
+                    volumeBar.value = Math.min(1, parseFloat(volumeBar.value) + 0.05);
+                    setVolume();
+                    break;
+                case 'arrowdown':
+                    // Down arrow for volume down
+                    e.preventDefault();
+                    volumeBar.value = Math.max(0, parseFloat(volumeBar.value) - 0.05);
+                    setVolume();
+                    break;
+                case 'm':
+                    // M to mute/unmute
+                    e.preventDefault();
+                    if (audio.volume > 0) {
+                        volumeBar.value = 0;
+                    } else {
+                        volumeBar.value = 0.7;
+                    }
+                    setVolume();
+                    break;
+                case 'l':
+                    // L to toggle lyrics
+                    e.preventDefault();
+                    toggleLyrics();
+                    break;
+                case 's':
+                    // S to toggle shuffle
+                    e.preventDefault();
+                    toggleShuffle();
+                    break;
+                case 'r':
+                    // R to toggle repeat
+                    e.preventDefault();
+                    toggleRepeat();
+                    break;
+            }
+        }
+
+        // Handle window resize
+        function handleResize() {
+            visualizerCanvas.width = visualizerContainer.offsetWidth;
+            visualizerCanvas.height = visualizerContainer.offsetHeight;
+        }
+
+        // Show notification
+        function showNotification(message) {
+            Toastify({
+                text: message,
+                duration: 3000,
+                gravity: "bottom",
+                position: "right",
+                style: {
+                    background: "linear-gradient(to right, #0a0a0a, #1a1a1a)",
+                    border: "1px solid #00ffff",
+                    color: "#00ffff",
+                    "box-shadow": "0 0 10px rgba(0, 255, 255, 0.5)"
+                }
+            }).showToast();
+        }
+
+        // Initialize the app
+        init();
+    </script>
+</body>
+</html>
