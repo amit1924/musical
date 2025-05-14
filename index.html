@@ -62,22 +62,19 @@
         }
     </script>
     <style>
-        .equalizer-bar {
-            animation: equalize 1.5s infinite ease-in-out;
-            transform-origin: bottom;
-        }
-        
-        .equalizer-bar:nth-child(1) { animation-delay: 0.1s; height: 10px; }
-        .equalizer-bar:nth-child(2) { animation-delay: 0.3s; height: 20px; }
-        .equalizer-bar:nth-child(3) { animation-delay: 0.5s; height: 30px; }
-        .equalizer-bar:nth-child(4) { animation-delay: 0.2s; height: 15px; }
-        .equalizer-bar:nth-child(5) { animation-delay: 0.4s; height: 25px; }
-        
-        @keyframes equalize {
-            0%, 100% { transform: scaleY(0.3); }
-            50% { transform: scaleY(1); }
-        }
-        
+    .equalizer-bar {
+    transform-origin: bottom;
+    transition: transform 0.1s ease-out, opacity 0.1s ease-out;
+    will-change: transform;
+    min-height: 110px; /* Minimum height when no sound */
+}
+
+.equalizer-bar:nth-child(1) { width: 15px; background: #ff00ff; }
+.equalizer-bar:nth-child(2) { width: 15px; background: #00ffff; }
+.equalizer-bar:nth-child(3) { width: 15px; background: #cc00ff; }
+.equalizer-bar:nth-child(4) { width: 15px; background: #00ff99; }
+.equalizer-bar:nth-child(5) { width: 15px; background: #ff00ff; }
+       
        /* Add this to your CSS */
     @keyframes spin {
     from { transform: rotate(0deg); }
@@ -418,7 +415,7 @@
             </div>
             
             <!-- Equalizer -->
-            <div class="mt-8 flex justify-center space-x-1 h-12 items-end">
+            <div class="mt-8 flex justify-center space-x-1 h-24 items-end">
                 <div class="equalizer-bar w-2 bg-neon-pink rounded-t"></div>
                 <div class="equalizer-bar w-2 bg-neon-blue rounded-t"></div>
                 <div class="equalizer-bar w-2 bg-neon-purple rounded-t"></div>
@@ -710,6 +707,7 @@
 
 
     // DOM Elements
+     // DOM Elements
     const audio = new Audio();
     const albumArt = document.getElementById('album-art');
     const songTitle = document.getElementById('song-title');
@@ -797,6 +795,9 @@
     let bpm = 0;
     let currentGenre = '';
 
+    //new variables
+    
+
     // EQ Preset Configurations
     const eqPresetConfigs = {
         'flat': { bass: 0, mids: 0, treble: 0 },
@@ -829,8 +830,9 @@
         // Event Listeners
         setupEventListeners();
         
-        // Set initial volume
-        audio.volume = volumeBar.value;
+        // Set initial volume to 50% (0.5) instead of full volume
+        audio.volume = 0.5;
+        volumeBar.value = 0.5;
         
         // Set initial theme
         updateThemeIcon();
@@ -969,7 +971,8 @@
             
             const source = audioContext.createMediaElementSource(audio);
             analyser = audioContext.createAnalyser();
-            analyser.fftSize = 256;
+            analyser.fftSize = 64; 
+            
             
             // Create beat detector
             beatDetector = audioContext.createAnalyser();
@@ -979,48 +982,72 @@
             const splitter = audioContext.createChannelSplitter(2);
             const merger = audioContext.createChannelMerger(2);
             
-            // Create filters for EQ
-            const bassFilter = audioContext.createBiquadFilter();
-            bassFilter.type = "lowshelf";
-            bassFilter.frequency.value = 250;
+            // Create filters for EQ (one for each channel)
+            const bassFilterL = audioContext.createBiquadFilter();
+            bassFilterL.type = "lowshelf";
+            bassFilterL.frequency.value = 250;
             
-            const midFilter = audioContext.createBiquadFilter();
-            midFilter.type = "peaking";
-            midFilter.frequency.value = 1000;
-            midFilter.Q.value = 1;
+            const midFilterL = audioContext.createBiquadFilter();
+            midFilterL.type = "peaking";
+            midFilterL.frequency.value = 1000;
+            midFilterL.Q.value = 1;
             
-            const trebleFilter = audioContext.createBiquadFilter();
-            trebleFilter.type = "highshelf";
-            trebleFilter.frequency.value = 4000;
+            const trebleFilterL = audioContext.createBiquadFilter();
+            trebleFilterL.type = "highshelf";
+            trebleFilterL.frequency.value = 4000;
             
-            // Connect nodes
+            const bassFilterR = audioContext.createBiquadFilter();
+            bassFilterR.type = "lowshelf";
+            bassFilterR.frequency.value = 250;
+            
+            const midFilterR = audioContext.createBiquadFilter();
+            midFilterR.type = "peaking";
+            midFilterR.frequency.value = 1000;
+            midFilterR.Q.value = 1;
+            
+            const trebleFilterR = audioContext.createBiquadFilter();
+            trebleFilterR.type = "highshelf";
+            trebleFilterR.frequency.value = 4000;
+            
+            // Connect nodes for stereo processing
             source.connect(splitter);
-            splitter.connect(bassFilter, 0);
-            splitter.connect(midFilter, 0);
-            splitter.connect(trebleFilter, 0);
             
-            bassFilter.connect(analyser);
+            // Left channel processing
+            splitter.connect(bassFilterL, 0);
+            bassFilterL.connect(midFilterL);
+            midFilterL.connect(trebleFilterL);
+            trebleFilterL.connect(analyser);
             analyser.connect(merger, 0, 0);
             
-            midFilter.connect(analyser);
-            analyser.connect(merger, 0, 0);
+            // Right channel processing
+            splitter.connect(bassFilterR, 1);
+            bassFilterR.connect(midFilterR);
+            midFilterR.connect(trebleFilterR);
+            trebleFilterR.connect(analyser);
+            analyser.connect(merger, 0, 1);
             
-            trebleFilter.connect(analyser);
-            analyser.connect(merger, 0, 0);
-            
-            trebleFilter.connect(beatDetector);
+            // Connect beat detector
+            trebleFilterL.connect(beatDetector);
             beatDetector.connect(merger, 0, 0);
             
             merger.connect(audioContext.destination);
+              source.connect(analyser);
+        analyser.connect(audioContext.destination);
             
             dataArray = new Uint8Array(analyser.frequencyBinCount);
+             // Start the animation if playing
+        if (isPlaying) animateEqualizer();
+    
             
             // Store nodes for EQ control
             audioNodes.source = source;
             audioNodes.analyser = analyser;
-            audioNodes.bassFilter = bassFilter;
-            audioNodes.midFilter = midFilter;
-            audioNodes.trebleFilter = trebleFilter;
+            audioNodes.bassFilterL = bassFilterL;
+            audioNodes.midFilterL = midFilterL;
+            audioNodes.trebleFilterL = trebleFilterL;
+            audioNodes.bassFilterR = bassFilterR;
+            audioNodes.midFilterR = midFilterR;
+            audioNodes.trebleFilterR = trebleFilterR;
             
             // Set initial EQ to flat
             setEQValues('flat');
@@ -1031,15 +1058,48 @@
         }
     }
 
-    // Set EQ values based on preset
+    
+// Add this function to animate the equalizer bars based on audio data
+function animateEqualizer() {
+    if (!analyser) return;
+    
+    // Get frequency data
+    analyser.getByteFrequencyData(dataArray);
+    
+    // Update equalizer bars
+    const bars = document.querySelectorAll('.equalizer-bar');
+    bars.forEach((bar, i) => {
+        // Use different frequency bands for each bar
+        const freqIndex = Math.floor(i * (dataArray.length / bars.length));
+        const height = dataArray[freqIndex] / 255 * 100; // Scale to percentage
+        
+        // Apply the height with smooth transition
+        bar.style.transform = `scaleY(${height / 100})`;
+        bar.style.opacity = 0.3 + (height / 100 * 0.7); // Vary opacity based on intensity
+    });
+    
+    animationId = requestAnimationFrame(animateEqualizer);
+}
+
+    // Set EQ values based on preset (applied to both channels)
     function setEQValues(presetName) {
         const preset = eqPresetConfigs[presetName];
-        if (!preset || !audioNodes.bassFilter) return;
+        if (!preset || !audioNodes.bassFilterL) return;
         
         // Convert our simple 0-6 scale to dB values (-12dB to +12dB)
-        audioNodes.bassFilter.gain.value = (preset.bass - 3) * 4;
-        audioNodes.midFilter.gain.value = (preset.mids - 3) * 4;
-        audioNodes.trebleFilter.gain.value = (preset.treble - 3) * 4;
+        const bassGain = (preset.bass - 3) * 4;
+        const midGain = (preset.mids - 3) * 4;
+        const trebleGain = (preset.treble - 3) * 4;
+        
+        // Apply to left channel
+        audioNodes.bassFilterL.gain.value = bassGain;
+        audioNodes.midFilterL.gain.value = midGain;
+        audioNodes.trebleFilterL.gain.value = trebleGain;
+        
+        // Apply to right channel
+        audioNodes.bassFilterR.gain.value = bassGain;
+        audioNodes.midFilterR.gain.value = midGain;
+        audioNodes.trebleFilterR.gain.value = trebleGain;
     }
 
     // Detect beats from audio data
@@ -1176,7 +1236,10 @@
 
     // Load song
     function loadSong(index) {
-        if (animationId) cancelAnimationFrame(animationId);
+         if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
         
         const song = filteredSongs[index];
         currentGenre = song.genre || '';
@@ -1455,9 +1518,11 @@
         if (audioContext && audioContext.state === 'suspended') {
             audioContext.resume().then(() => {
                 audio.play().catch(e => handlePlaybackError(e));
+                animateEqualizer();
             });
         } else {
             audio.play().catch(e => handlePlaybackError(e));
+            animateEqualizer();
         }
         
         if (isVisualizerVisible) drawVisualizer();
@@ -1477,7 +1542,10 @@
         playPauseBtn.innerHTML = '<i class="fas fa-play text-xl text-neon-blue"></i>';
         audio.pause();
         
-        if (animationId) cancelAnimationFrame(animationId);
+         if (animationId) {
+        cancelAnimationFrame(animationId);
+        animationId = null;
+    }
     }
 
     // Handle song end
