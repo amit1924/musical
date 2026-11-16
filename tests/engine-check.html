@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>KK audio engine — offline verification</title>
+    <style>
+      body { font: 14px/1.6 ui-monospace, Menlo, monospace; background: #111214; color: #eaeaea; padding: 28px; }
+      h1 { font-size: 18px; margin-bottom: 6px; }
+      p.sub { color: #8c8c93; margin-bottom: 22px; max-width: 720px; }
+      table { border-collapse: collapse; width: 100%; max-width: 900px; }
+      th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #26262c; }
+      th { color: #8c8c93; font-weight: 500; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; }
+      .ok { color: #5bd68a; }
+      .bad { color: #ff6b6b; }
+      .muted { color: #74747c; }
+      #summary { margin: 18px 0; padding: 12px 16px; border-radius: 10px; background: #191a1f; }
+      code { color: #ffb27a; }
+    </style>
+  </head>
+  <body>
+    <h1>KK audio engine — offline verification</h1>
+    <p class="sub">
+      Renders a deliberately hot signal (0.95 peak, bass-heavy) through the real engine graph in an
+      OfflineAudioContext. Pass = the limiter keeps the output below 0 dBFS and the reverb tail decays.
+    </p>
+    <div id="summary">running…</div>
+    <table>
+      <thead>
+        <tr><th>Preset</th><th>Preamp</th><th>Space</th><th>Peak (dBFS)</th><th>RMS (dBFS)</th><th>Result</th></tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p class="sub" style="margin-top:22px" id="extra"></p>
+    <script src="../audio-engine.js"></script>
+    <script src="engine-check.js"></script>
+  </body>
+</html>
